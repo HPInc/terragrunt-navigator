@@ -1,0 +1,20 @@
+v0.2.5
+- Initial Release
+- Support for cloning repo mentioned in source
+- Support for navigating to the folder/file mentionen in config_path, find_in_parent_folders
+- Highlight recognized keys and values with different color
+- Tooltip for recognized keys/values
+- Support for few terragrunt and terraform functions
+
+v0.2.7
+- Support for file with relative path
+- Support for unary and binary operations
+- Bug fixes
+
+v0.2.8
+- Support for var.<name> to show the information about variables used
+- For every main.tf loaded, it looks for data.tf in the same directory and load if found
+
+v0.2.9
+- Support for highlighting variable
+- Bug fix for highlighting not available on some key/values

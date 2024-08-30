@@ -1,0 +1,29 @@
+**
+!extension.js
+!package.json
+!icon.png
+!README.md
+!LICENSE.txt
+!CHANGELOG
+!get-code.sh
+
+# Test files
+**/test/**
+**/__tests__/**
+**/*.spec.ts
+**/*.test.ts
+
+# Documentation
+**/*.md
+!README.md
+/docs/**
+
+# Source maps
+**/*.map
+
+# Development specific
+.git/**
+.vscode/**
+node_modules/**
+*.tsconfig.json
+*.eslintrc.json

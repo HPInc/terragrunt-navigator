@@ -1,0 +1,97 @@
+{
+  "activationEvents": [
+    "onLanguage:terragrunt",
+    "onLanguage:terraform",
+    "onLanguage:hcl"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "terragrunt-navigator.replacementStringsCommand",
+        "title": "Terragrunt Navigator: Replacement Strings"
+      },
+      {
+        "command": "terragrunt-navigator.featureTogglesCommand",
+        "title": "Terragrunt Navigator: Feature Toggles"
+      }
+    ],
+    "configuration": {
+      "properties": {
+        "terragrunt-navigator.featureToggles": {
+          "default": {},
+          "description": "Controls the feature toggles for the Terragrunt Navigator extension.",
+          "properties": {
+            "ReplaceStrings": {
+              "default": true,
+              "description": "Enable/disable string replacements feature.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "terragrunt-navigator.replacementStrings": {
+          "default": [],
+          "description": "Array of replacement strings",
+          "items": {
+            "properties": {
+              "find": {
+                "type": "string"
+              },
+              "replace": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "find",
+              "replace"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "resources": [
+        {
+          "path": "navigate.png",
+          "type": "image"
+        }
+      ],
+      "title": "Terragrunt Navigator"
+    }
+  },
+  "dependencies": {
+    "antlr4": "^4.13.2",
+    "npm-cli": "^0.1.0"
+  },
+  "description": "Navigate terragrunt/terrform code with Ctrl+click",
+  "devDependencies": {
+    "@babel/cli": "^7.24.8",
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "vscode": "^1.1.34",
+    "webpack": "^5.64.4",
+    "webpack-cli": "^4.10.0"
+  },
+  "displayName": "Terragrunt/Terraform Navigator",
+  "engines": {
+    "vscode": ">=1.63.0"
+  },
+  "icon": "icon.png",
+  "license": "MIT",
+  "main": "./extension.js",
+  "name": "terragrunt-navigator",
+  "publisher": "RenyPaul",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/renypaul/terragrunt-navigator.git"
+  },
+  "scripts": {
+    "build:dev": "webpack --mode none",
+    "build:prod": "webpack --mode production",
+    "compile": "java -jar /usr/local/lib/antlr-4.13.2-complete.jar -Dlanguage=JavaScript hcl.g4 -o generated -Xexact-output-dir -visitor && npx babel generated --out-dir generated-cjs"
+  },
+  "version": "0.2.9"
+}

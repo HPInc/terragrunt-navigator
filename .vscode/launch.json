@@ -1,0 +1,20 @@
+{
+  "configurations": [
+    {
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "env": {
+        "NODE_ENV": "debug"
+      },
+      "name": "Run Extension",
+      "outFiles": [
+        "${workspaceFolder}/extension.js"
+      ],
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "type": "extensionHost"
+    }
+  ],
+  "version": "0.2.0"
+}
