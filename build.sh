@@ -40,7 +40,7 @@ declare FILES=(
   icon.png
   extension.js
   parser.js
-  generated-cjs
+  hcl.g4
   get-code.sh)
 
 mkdir -p dist

@@ -1,0 +1,9 @@
+{
+  "tabWidth": 4,
+  "useTabs": false,
+  "bracketSameLine": true,
+  "singleQuote": true,
+  "endOfLine": "lf",
+  "bracketSpacing": true,
+  "printWidth": 120
+}

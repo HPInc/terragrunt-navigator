@@ -1,0 +1,97 @@
+Reading config for TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/cluster/terragrunt.hcl
+Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/cluster/terragrunt.hcl
+Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc.hcl
+{
+  "terraform": {
+    "source": "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git//modules/aws-auth?ref=v20.24.0"
+  },
+  "locals": {
+    "type": "shop",
+    "zone1": "mst",
+    "zone2": "pst",
+    "a": [
+      1,
+      2
+    ],
+    "b": [
+      [
+        1,
+        2
+      ],
+      3
+    ],
+    "c": {
+      "a": 1,
+      "b": 2
+    },
+    "d": [
+      {
+        "c": 5
+      },
+      {
+        "d": 7
+      }
+    ],
+    "primary": "shop-mst-us",
+    "secondary": "shop-pst-us",
+    "add_failover": false,
+    "cluster_names": [
+      "shop-mst-us",
+      "shop-pst-us"
+    ],
+    "negative_number": -5,
+    "positive_number": 5,
+    "not_add_failover": true,
+    "is_production": false,
+    "is_mst_zone": true,
+    "is_pst_zone": true,
+    "is_a_greater_than_b": false,
+    "enable_feature": false,
+    "disable_feature": true,
+    "instances": [
+      {
+        "name": "instance1",
+        "type": "t2.micro",
+        "active": true
+      },
+      {
+        "name": "instance2",
+        "type": "t2.medium",
+        "active": false
+      },
+      {
+        "name": "instance3",
+        "type": "t2.large",
+        "active": true
+      }
+    ],
+    "names": [
+      "Alice",
+      "Bob",
+      "Charlie"
+    ],
+    "kms_key_id": "module.kms_key[10].key_id"
+  },
+  "output": {
+    "greetings": {
+      "value": [
+        "Hello, Bob!"
+      ],
+      "active_instances": {
+        "instance1": "t2.micro",
+        "instance3": "t2.large"
+      }
+    }
+  },
+  "include": {
+    "path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/terragrunt.hcl"
+  },
+  "dependency": {
+    "vpc": {
+      "config_path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc"
+    }
+  },
+  "inputs": {
+    "region_code": "us-east-1"
+  }
+}

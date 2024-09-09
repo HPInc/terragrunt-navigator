@@ -14,6 +14,41 @@
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "type": "extensionHost"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Node App",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/parser.js",
+      "args": [
+        //"tests/env/region/cluster/terragrunt.hcl"
+        "/root/op.hcl"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Test App",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/test.js",
+      "args": [
+        "/tmp/a"
+      ]
+    },
+    {
+      "name": "Debug ANTLR4 grammar",
+      "type": "antlr-debug",
+      "request": "launch",
+      "input": "/root/op.hcl",
+      "grammar": "${workspaceFolder}/hcl.g4",
+      "startRule": "configFile",
+      "printParseTree": true,
+      "visualParseTree": true
     }
   ],
   "version": "0.2.0"

@@ -1,312 +1,250 @@
-/*
-BSD License
-
-Copyright (c) 2020, Tom Everett
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-3. Neither the name of Tom Everett nor the names of its contributors
-   may be used to endorse or promote products derived from this software
-   without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-// $antlr-format alignTrailingComments true, columnLimit 150, minEmptyLines 1, maxEmptyLinesToKeep 1, reflowComments false, useTab false
-// $antlr-format allowShortRulesOnASingleLine false, allowShortBlocksOnASingleLine true, alignSemicolons hanging, alignColons hanging
-
 grammar hcl;
 
+QUOTE: '"';
+PLUS: '+';
+MINUS: '-';
+STAR: '*';
+SLASH: '/';
+PERCENT: '%';
+NOT: '!';
+AND: '&&';
+OR: '||';
+EQUAL: '==';
+NOT_EQUAL: '!=';
+LESS_THAN: '<';
+GREATER_THAN: '>';
+LESS_EQUAL: '<=';
+GREATER_EQUAL: '>=';
+QUESTION: '?';
+COLON: ':';
+ARROW: '=>';
+ASSIGN: '=';
+LCURL: '{';
+RCURL: '}';
+LBRACK: '[';
+RBRACK: ']';
+LPAREN: '(';
+RPAREN: ')';
+DOT: '.';
+COMMA: ',';
+ELLIPSIS: '...';
+DOLLAR_LCURL: '${';
+PERCENT_LCURL: '%{';
+TRUE: 'true';
+FALSE: 'false';
+NULL: 'null';
+
 configFile
-    : (local | module | output | provider | variable | data | resource | terraform | include | generate | remote_state | dependency | dependencies | inputs)+ EOF
+    : body EOF
     ;
 
-terraform
-    : 'terraform' blockbody
-    ;
-
-resource
-    : 'resource' resourcetype name blockbody
-    ;
-
-data
-    : 'data' resourcetype name blockbody
-    ;
-
-provider
-    : PROVIDER resourcetype blockbody
-    ;
-
-output
-    : 'output' name blockbody
-    ;
-
-local
-    : 'locals' blockbody
-    ;
-
-module
-    : 'module' name blockbody
-    ;
-
-variable
-    : VARIABLE name blockbody
+body
+    : (argument | block | oneLineBlock)*
     ;
 
 block
-    : blocktype (label)? (label)? blockbody
+    : IDENTIFIER (IDENTIFIER | STRING_LITERAL)* LCURL body RCURL
     ;
 
-blocktype
-    : IDENTIFIER
-    ;
-
-resourcetype
-    : STRING
-    ;
-
-name
-    : STRING
-    ;
-
-label
-    : STRING
-    ;
-
-blockbody
-    : LCURL (argument | block)* RCURL
+oneLineBlock
+    : IDENTIFIER (IDENTIFIER | STRING_LITERAL)* LCURL argument? RCURL
     ;
 
 argument
-    : identifier '=' expression
-    ;
-
-identifier
-    : (('local' | 'data' | 'var' | 'module') DOT)? identifierchain
-    ;
-
-identifierchain
-    : (IDENTIFIER | IN | VARIABLE | PROVIDER | 'dependency' | 'locals' | 'data') index? (DOT identifierchain)*
-    | STAR (DOT identifierchain)*
-    | inline_index (DOT identifierchain)*
-    ;
-
-
-inline_index
-    : NATURAL_NUMBER
+    : IDENTIFIER ASSIGN expression
     ;
 
 expression
-    : unary_operator expression
-    | section
-    | expression binary_operator expression
+    : exprTerm
+    | operation
+    | conditional
+    ;
+
+exprTerm
+    : literals
+    | collectionValue
+    | templateExpr
+    | variableExpr
+    | functionCall
+    | forExpr
+    | exprTerm index
+    | exprTerm getAttr
+//    | exprTerm splat
     | LPAREN expression RPAREN
-    | expression '?' expression ':' expression
-    | forloop
     ;
 
-forloop
-    : 'for' identifier 'in' expression ':' expression ('if' expression)?
+literals
+    : basicLiterals
+    | boolean
+    | interpolatedString
+    | stringLiteral
     ;
 
-section
-    : list_
-    | map_
-    | val
+basicLiterals
+    : NUMBER
+    | NULL
     ;
 
-val
-    : NULL_
-    | signed_number
-    | string
-    | identifier
-    | BOOL
-    | DESCRIPTION
-    | functioncall
-    | EOF_
+stringLiteral
+    : STRING_LITERAL
     ;
 
-functioncall
-    : functionname LPAREN functionarguments RPAREN
+collectionValue
+    : tuple
+    | object
     ;
 
-functionname
-    : IDENTIFIER
+tuple
+    : LBRACK (expression ((COMMA |) expression)* COMMA?)? RBRACK
     ;
 
-functionarguments
-    : //no arguments
-    | expression (',' expression)*
+object
+    : LCURL ((objectElement ((COMMA? |) objectElement)* COMMA?)?) RCURL
+    ;
+
+objectElement
+    : (IDENTIFIER | expression) (ASSIGN | COLON) expression
     ;
 
 index
-    : '[' expression ']'
+    : LBRACK expression RBRACK
     ;
 
-list_
-    : '[' (expression (',' expression)* ','?)? ']'
+
+getAttr
+    : (index | (DOT IDENTIFIER))+
     ;
 
-map_
-    : LCURL (argument ','?)* RCURL
+interpolatedString
+    : INTERPOLATED_STRING
     ;
 
-string
-    : STRING
-    | MULTILINESTRING
+operation
+    : unaryOp
+    | binaryOp
     ;
 
-fragment DIGIT
-    : [0-9]
+unaryOp
+    :  unaryOperator (exprTerm|operation)
     ;
 
-signed_number
-    : ('+' | '-')? number
+binaryOp
+    : exprTerm binaryOperator (exprTerm|operation)
     ;
 
-VARIABLE
-    : 'variable'
+unaryOperator
+    : PLUS
+    | MINUS
+    | NOT
     ;
 
-PROVIDER
-    : 'provider'
+binaryOperator
+    : compareOperator
+    | arithmeticOperator
+    | logicOperator
     ;
 
-IN
-    : 'in'
+compareOperator
+    : EQUAL
+    | NOT_EQUAL
+    | LESS_THAN
+    | GREATER_THAN
+    | LESS_EQUAL
+    | GREATER_EQUAL
     ;
 
-STAR
-    : '*'
+arithmeticOperator
+    : STAR
+    | SLASH
+    | PERCENT
+    | PLUS
+    | MINUS
     ;
 
-DOT
-    : '.'
+logicOperator
+    : AND
+    | OR
     ;
 
-unary_operator
-    : '!'
+boolean
+    : TRUE
+    | FALSE
     ;
 
-binary_operator
-    : '/'
-    | STAR
-    | '%'
-    | '+'
-    | '-'
-    | '>'
-    | '>='
-    | '<'
-    | '<='
-    | '=='
-    | '!='
-    | '&&'
-    | '||'
+// TODO: Add support for nested conditional
+conditional
+    :  (exprTerm | operation) QUESTION expression COLON expression
     ;
 
-LCURL
-    : '{'
+templateExpr
+    : DOLLAR_LCURL expression RCURL
     ;
 
-RCURL
-    : '}'
+variableExpr
+    : IDENTIFIER
     ;
 
-LPAREN
-    : '('
+functionCall
+    : IDENTIFIER LPAREN functionArgs RPAREN
     ;
 
-RPAREN
-    : ')'
+functionArgs
+    : (expression (COMMA expression)* (COMMA | ELLIPSIS)?)?
     ;
 
-EOF_
-    : '<<EOF' .*? 'EOF'
+forExpr
+    : forTupleExpr
+    | forObjectExpr
     ;
 
-NULL_
-    : 'nul'
+forObjectExpr
+    : LCURL forIntro expression ARROW expression forCond? RCURL
     ;
 
-NATURAL_NUMBER
-    : DIGIT+
+forTupleExpr
+    : LBRACK forIntro expression forCond? RBRACK
     ;
 
-number
-    : NATURAL_NUMBER (DOT NATURAL_NUMBER)?
+forIntro
+    : 'for' IDENTIFIER (COMMA IDENTIFIER)? 'in' expression ':'
     ;
 
-BOOL
-    : 'true'
-    | 'false'
-    ;
-
-DESCRIPTION
-    : '<<DESCRIPTION' .*? 'DESCRIPTION'
-    ;
-
-MULTILINESTRING
-    : '<<' '-'? 'EOF' .*? 'EOF'
-    ;
-
-STRING
-    : '"' ('\\"' | ~["\r\n])* '"'
+forCond
+    : 'if' expression
     ;
 
 IDENTIFIER
-    : [a-zA-Z] ([a-zA-Z0-9_-])*
+    : [a-zA-Z_][a-zA-Z_0-9-]*
     ;
 
-COMMENT
-    : ('#' | '//') ~ [\r\n]* -> channel(HIDDEN)
+NUMBER
+    : DECIMAL+ (DOT DECIMAL+)? (EXPMARK DECIMAL+)?
     ;
 
-BLOCKCOMMENT
-    : '/*' .*? '*/' -> channel(HIDDEN)
+INTERPOLATED_STRING
+    : (QUOTE ~[\r\n]*? (DOLLAR_LCURL ~[\r\n]*? RCURL) ~[\r\n]*? QUOTE)
+    ;
+
+STRING_LITERAL
+    : QUOTE (ESCAPED_CHAR|.)*? QUOTE
+    ;
+
+fragment DECIMAL
+    : [0-9]
+    ;
+
+fragment EXPMARK
+    : [eE] [+-]?
+    ;
+
+fragment ESCAPED_CHAR
+    : '\\' [btnfr"\\]
     ;
 
 WS
-    : [ \r\n\t]+ -> skip
+    : [ \t\r\n]+ -> skip
     ;
 
-include
-    : 'include' name? blockbody
-    ;
-
-generate
-    : 'generate' name blockbody
-    ;
-
-remote_state
-    : 'remote_state' name blockbody
-    ;
-
-dependency
-    : 'dependency' name blockbody
-    ;
-
-dependencies
-    : 'dependencies' blockbody
-    ;
-
-inputs
-    : 'inputs' '=' blockbody
+COMMENT
+    : ('#' ~[\r\n]* | '//' ~[\r\n]* | '/*' .*? '*/') -> channel(HIDDEN)
     ;

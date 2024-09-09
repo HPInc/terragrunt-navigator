@@ -18,3 +18,14 @@ v0.2.8
 v0.2.9
 - Support for highlighting variable
 - Bug fix for highlighting not available on some key/values
+
+v0.2.10
+- Fix for " inside the source like "${read_terragrunt_config(find_in_parent_folders("vpc.hcl")).locals.version}"
+
+v0.4.0
+- Rewrittern parser from scratch
+- Nested maps and list support
+- More compatiblity for terraform configs
+- Support for ternary operator
+- Initial support for "for var in" for list and maps
+- Added test case for basic validation
