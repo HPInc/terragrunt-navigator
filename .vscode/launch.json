@@ -29,18 +29,6 @@
       ]
     },
     {
-      "type": "node",
-      "request": "launch",
-      "name": "Test App",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
-      "program": "${workspaceFolder}/test.js",
-      "args": [
-        "/tmp/a"
-      ]
-    },
-    {
       "name": "Debug ANTLR4 grammar",
       "type": "antlr-debug",
       "request": "launch",

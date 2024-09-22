@@ -14,8 +14,6 @@ function traverse(tfInfo, parser, node, configs, ranges, identInfo) {
         let ruleName = parser.ruleNames[child.ruleIndex];
         if (ruleName === undefined) {
             continue;
-        } else {
-            //console.debug(ruleName + " -> " + child.getText());
         }
         if (ruleName === 'block') {
             let firstChild = child.children[0];
@@ -38,12 +36,13 @@ function traverse(tfInfo, parser, node, configs, ranges, identInfo) {
             let rangesBlock = ranges;
             let identifierCount = 0;
             let stringLiteralCount = 0;
-            for (const _ of child.children) {
+            let totalLabels = (child.IDENTIFIER?.length ?? 0) + (child.STRING_LITERAL?.length ?? 0);
+            for (let ii = 0; ii < totalLabels; ii++) {
                 let label = null;
-                if (child.IDENTIFIER(identifierCount)) {
+                if (typeof child.IDENTIFIER === 'function' && child.IDENTIFIER(identifierCount)) {
                     label = child.IDENTIFIER(identifierCount).getText();
                     identifierCount++;
-                } else if (child.STRING_LITERAL(stringLiteralCount)) {
+                } else if (typeof child.STRING_LITERAL === 'function' && child.STRING_LITERAL(stringLiteralCount)) {
                     label = child.STRING_LITERAL(stringLiteralCount).getText();
                     stringLiteralCount++;
                 }
@@ -340,10 +339,8 @@ function evalExpression(exp, tfInfo, processOutput = false) {
             let match = element;
             let key = match.substring(2, match.length - 1);
             let val = runEval(key, tfInfo, processOutput);
-            if (typeof val === 'string') {
-                if (val.startsWith('"') && val.endsWith('"')) {
-                    val = val.substring(1, val.length - 1);
-                }
+            if (typeof val === 'string' || typeof val === 'number') {
+                val = String(val).replace(/(^"|"$)/g, '');
                 value = value.replace(match, val);
             }
         }

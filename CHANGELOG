@@ -36,3 +36,6 @@ v0.6.0
 - Added initial support for splat
 - Added initial support for quotedTemplate and heredoc
 - Fixed vulnerabilities
+
+v0.8.0
+- Improvements in code checkout
