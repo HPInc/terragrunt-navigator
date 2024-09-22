@@ -16,40 +16,48 @@ locals {
     { c = 5 },
     { d = 7 }
   ]
+
+  regex_string  = "^(?:[A-Za-z0-9+/]{2})*(?:[A-Za-z0-9+/][NSD]==|[A-Za-z0-9+/]{2}[AFASDASDcgkosw048]=)?$"
+  quoted_string = "prefix-${local.type}-suffix"
+  here_doc      = <<EOF
+This is heredoc
+Its multiline
+EOF
   primary       = format("%s-%s-us", local.type, local.zone1)
   secondary     = format("%s-%s-us", local.type, local.zone2)
-  add_failover  = false
+  add_failover  = true
   cluster_names = local.add_failover ? [local.primary, local.secondary] : [local.primary]
 
   # Unary operators and negative numbers
-  negative_number = -5
-  positive_number = +5
+  negative_number  = -5
+  positive_number  = 5
   not_add_failover = !local.add_failover
 
   # Comparator operations
-  is_production = local.type == "production"
-  is_mst_zone   = local.zone1 == "mst"
-  is_pst_zone   = local.zone2 == "pst"
+  is_production       = local.type == "production"
+  is_mst_zone         = local.zone1 == "mst"
+  is_pst_zone         = local.zone2 == "pst"
   is_a_greater_than_b = local.a[0] > 5
 
   # Logical operations
-  enable_feature = local.is_production && local.is_mst_zone
+  enable_feature  = local.is_production && local.is_mst_zone
   disable_feature = !local.is_production || local.is_pst_zone
   instances = [
     { name = "instance1", type = "t2.micro", active = true },
     { name = "instance2", type = "t2.medium", active = false },
     { name = "instance3", type = "t2.large", active = true }
   ]
-  names = ["Alice", "Bob", "Charlie"]
+  names      = ["Alice", "Bob", "Charlie"]
   kms_key_id = var.kms_key_id == null ? module.kms_key[10].key_id : var.kms_key_id
+  region_file = "region.hcl"
+  region_vars1 = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  region_vars2 = read_terragrunt_config(find_in_parent_folders(local.region_file))
 }
 
 output "greetings" {
   value = [for name in local.names : "Hello, ${name}!" if name == "Bob"]
   active_instances = {
-    for instance in local.instances :
-    instance.name => instance.type
-    if instance.active
+    for instance in local.instances : instance.name => instance.type  if instance.active
   }
 }
 

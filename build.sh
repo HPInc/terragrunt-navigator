@@ -40,7 +40,10 @@ declare FILES=(
   icon.png
   extension.js
   parser.js
-  hcl.g4
+  terraform.js
+  terragrunt.js
+  hclLexer.g4
+  hclParser.g4
   get-code.sh)
 
 mkdir -p dist

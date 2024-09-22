@@ -1,57 +1,27 @@
-grammar hcl;
+parser grammar hclParser;
 
-QUOTE: '"';
-PLUS: '+';
-MINUS: '-';
-STAR: '*';
-SLASH: '/';
-PERCENT: '%';
-NOT: '!';
-AND: '&&';
-OR: '||';
-EQUAL: '==';
-NOT_EQUAL: '!=';
-LESS_THAN: '<';
-GREATER_THAN: '>';
-LESS_EQUAL: '<=';
-GREATER_EQUAL: '>=';
-QUESTION: '?';
-COLON: ':';
-ARROW: '=>';
-ASSIGN: '=';
-LCURL: '{';
-RCURL: '}';
-LBRACK: '[';
-RBRACK: ']';
-LPAREN: '(';
-RPAREN: ')';
-DOT: '.';
-COMMA: ',';
-ELLIPSIS: '...';
-DOLLAR_LCURL: '${';
-PERCENT_LCURL: '%{';
-TRUE: 'true';
-FALSE: 'false';
-NULL: 'null';
+options {
+    tokenVocab = hclLexer;
+}
 
 configFile
     : body EOF
     ;
 
 body
-    : (argument | block | oneLineBlock)*
+    : (argument | block | oneLineBlock | NEWLINE)*
     ;
 
 block
-    : IDENTIFIER (IDENTIFIER | STRING_LITERAL)* LCURL body RCURL
+    : IDENTIFIER (IDENTIFIER | STRING_LITERAL)* LCURL NEWLINE? body NEWLINE? RCURL
     ;
 
 oneLineBlock
-    : IDENTIFIER (IDENTIFIER | STRING_LITERAL)* LCURL argument? RCURL
+    : IDENTIFIER (IDENTIFIER | STRING_LITERAL)* LCURL argument? RCURL NEWLINE?
     ;
 
 argument
-    : IDENTIFIER ASSIGN expression
+    : IDENTIFIER ASSIGN expression NEWLINE?
     ;
 
 expression
@@ -69,14 +39,13 @@ exprTerm
     | forExpr
     | exprTerm index
     | exprTerm getAttr
-//    | exprTerm splat
+    | exprTerm splat
     | LPAREN expression RPAREN
     ;
 
 literals
     : basicLiterals
     | boolean
-    | interpolatedString
     | stringLiteral
     ;
 
@@ -95,11 +64,11 @@ collectionValue
     ;
 
 tuple
-    : LBRACK (expression ((COMMA |) expression)* COMMA?)? RBRACK
+    : LBRACK NEWLINE? (expression (COMMA | NEWLINE)* NEWLINE?)* NEWLINE? RBRACK
     ;
 
 object
-    : LCURL ((objectElement ((COMMA? |) objectElement)* COMMA?)?) RCURL
+    : LCURL NEWLINE? (objectElement (COMMA | NEWLINE)* NEWLINE?)* NEWLINE? RCURL
     ;
 
 objectElement
@@ -110,13 +79,21 @@ index
     : LBRACK expression RBRACK
     ;
 
-
 getAttr
     : (index | (DOT IDENTIFIER))+
     ;
 
-interpolatedString
-    : INTERPOLATED_STRING
+splat
+    : attrSplat
+    | fullSplat
+    ;
+
+attrSplat
+    : DOT STAR getAttr*
+    ;
+
+fullSplat
+    : LBRACK STAR RBRACK (getAttr | index)*
     ;
 
 operation
@@ -177,7 +154,24 @@ conditional
     ;
 
 templateExpr
-    : DOLLAR_LCURL expression RCURL
+    : quotedTemplate
+    | heredocTemplate
+    ;
+
+quotedTemplate
+    : QUOTED_TEMPLATE
+    ;
+
+heredocTemplate
+    : HEREDOC_START heredocContent* heredocEnd
+    ;
+
+heredocContent
+    : HEREDOC_CONTENT
+    ;
+
+heredocEnd
+    : HEREDOC_END
     ;
 
 variableExpr
@@ -198,53 +192,17 @@ forExpr
     ;
 
 forObjectExpr
-    : LCURL forIntro expression ARROW expression forCond? RCURL
+    : LCURL NEWLINE? forIntro expression ARROW expression forCond? NEWLINE? RCURL
     ;
 
 forTupleExpr
-    : LBRACK forIntro expression forCond? RBRACK
+    : LBRACK NEWLINE? forIntro expression forCond? RBRACK
     ;
 
 forIntro
-    : 'for' IDENTIFIER (COMMA IDENTIFIER)? 'in' expression ':'
+    : FOR IDENTIFIER (COMMA IDENTIFIER)? IN expression COLON NEWLINE?
     ;
 
 forCond
-    : 'if' expression
-    ;
-
-IDENTIFIER
-    : [a-zA-Z_][a-zA-Z_0-9-]*
-    ;
-
-NUMBER
-    : DECIMAL+ (DOT DECIMAL+)? (EXPMARK DECIMAL+)?
-    ;
-
-INTERPOLATED_STRING
-    : (QUOTE ~[\r\n]*? (DOLLAR_LCURL ~[\r\n]*? RCURL) ~[\r\n]*? QUOTE)
-    ;
-
-STRING_LITERAL
-    : QUOTE (ESCAPED_CHAR|.)*? QUOTE
-    ;
-
-fragment DECIMAL
-    : [0-9]
-    ;
-
-fragment EXPMARK
-    : [eE] [+-]?
-    ;
-
-fragment ESCAPED_CHAR
-    : '\\' [btnfr"\\]
-    ;
-
-WS
-    : [ \t\r\n]+ -> skip
-    ;
-
-COMMENT
-    : ('#' ~[\r\n]* | '//' ~[\r\n]* | '/*' .*? '*/') -> channel(HIDDEN)
+    : IF expression NEWLINE?
     ;

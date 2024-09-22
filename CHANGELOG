@@ -29,3 +29,10 @@ v0.4.0
 - Support for ternary operator
 - Initial support for "for var in" for list and maps
 - Added test case for basic validation
+
+v0.6.0
+- Improved support for for expression, for expression, strings, objects
+- Support for opening the repo folder from the workspace(instead of cache) if its already added
+- Added initial support for splat
+- Added initial support for quotedTemplate and heredoc
+- Fixed vulnerabilities

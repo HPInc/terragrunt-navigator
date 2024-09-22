@@ -4,7 +4,8 @@ const fs = require('fs');
 const os = require('os');
 const console = require('console');
 const { execSync } = require('child_process');
-let Terragrunt = require('./parser');
+const Parser = require('./parser');
+const Terragrunt = require('./terragrunt');
 
 let linkDecator = vscode.window.createTextEditorDecorationType({
     textDecoration: 'underline',
@@ -64,11 +65,11 @@ let rhsDecorator = vscode.window.createTextEditorDecorationType({
 class TerragruntNav {
     patterns = [
         {
-            pattern: /(source[ ]{0,}=[ ]{0,}")git::(ssh:\/\/|)(.*)\/\/([^#\r\n"?]+)\?([^#\r\n"]+)/,
+            pattern: /(source\s*=\s*")git::(ssh:\/\/|)(.*)\/\/([^#\r\n"?]+)\?([^#\r\n"]+)/,
             location: 'git',
         },
         {
-            pattern: /((source|config_path)[ ]{0,}=[ ]{0,}")([^#\r\n"]+)/,
+            pattern: /((source|config_path)\s*=\s*")([^#\r\n"]+)/,
             location: 'local',
         },
         {
@@ -172,7 +173,7 @@ class TerragruntNav {
 
     decorateKeys(decorations, configs = {}, ranges = {}) {
         for (let key in configs) {
-            if (ranges && ranges.hasOwnProperty(key)) {
+            if (ranges?.hasOwnProperty(key)) {
                 let value = configs[key];
                 let range = ranges[key];
                 if (range.hasOwnProperty('__range')) {
@@ -200,21 +201,22 @@ class TerragruntNav {
             }
 
             try {
-                let pattern = /\${(local|var|dependency)\.[^}]+}|(local|var|dependency)\.[a-zA-Z_][a-zA-Z0-9_\.]*/g;
+                let pattern =
+                    /\${(local|var|dependency|module)\.[^}]+}|(local|var|dependency|module)\.[a-zA-Z_][a-zA-Z0-9_.]*/g;
                 let match = textLine.text.match(pattern);
                 if (!match) {
                     continue;
                 }
 
-                for (let ii = 0; ii < match.length; ii++) {
-                    let str = match[ii].trim();
-                    var value = Terragrunt.evalExpression(str, this.tfInfo);
-                    value = Terragrunt.processValue(value, this.tfInfo);
+                for (const element of match) {
+                    let str = element.trim();
+                    let value = Parser.evalExpression(str, this.tfInfo);
+                    value = Parser.processValue(value, this.tfInfo);
                     let range = new vscode.Range(
                         line,
-                        textLine.text.indexOf(match[ii]),
+                        textLine.text.indexOf(element),
                         line,
-                        textLine.text.indexOf(match[ii]) + match[ii].length,
+                        textLine.text.indexOf(element) + element.length,
                     );
                     let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
                     message.isTrusted = true;
@@ -254,19 +256,25 @@ class TerragruntNav {
 
     updateConfigs() {
         try {
-            this.tfInfo.configs = {};
-            this.tfInfo.ranges = {};
+            this.tfInfo = {
+                freshStart: true,
+                printTree: false,
+                traverse: Parser.traverse,
+            };
             console.log('Reading config for ' + vscode.window.activeTextEditor.document.uri.fsPath);
             if (path.basename(vscode.window.activeTextEditor.document.uri.fsPath) === 'main.tf') {
                 let varFile = vscode.window.activeTextEditor.document.uri.fsPath.replace('main.tf', 'variables.tf');
                 if (fs.existsSync(varFile)) {
                     console.log('Reading variables for main.tf ' + varFile);
                     this.tfInfo.freshStart = true;
-                    Terragrunt.read_terragrunt_config(varFile, this.tfInfo);
+                    Terragrunt.read_terragrunt_config.apply(this.tfInfo, [varFile, this.tfInfo]);
                 }
             }
             this.tfInfo.freshStart = true;
-            Terragrunt.read_terragrunt_config(vscode.window.activeTextEditor.document.uri.fsPath, this.tfInfo);
+            Terragrunt.read_terragrunt_config.apply(this.tfInfo, [
+                vscode.window.activeTextEditor.document.uri.fsPath,
+                this.tfInfo,
+            ]);
         } catch (e) {
             console.log('Failed to read terragrunt config: ' + e);
         }
@@ -280,7 +288,7 @@ class TerragruntNav {
             let func = match[2].trim();
             let funcArgs = match[3].trim();
             if (func === 'find_in_parent_folders') {
-                srcPath = Terragrunt.find_in_parent_folders(funcArgs);
+                srcPath = Terragrunt.find_in_parent_folders.apply(this.tfInfo, [funcArgs]);
                 if (!srcPath) {
                     return null;
                 }
@@ -294,8 +302,8 @@ class TerragruntNav {
                 srcPath = srcPath.replace(replacement.find, replacement.replace);
             }
         }
-        srcPath = Terragrunt.evalExpression(srcPath, this.tfInfo);
-        srcPath = Terragrunt.processValue(srcPath, this.tfInfo);
+        srcPath = Parser.evalExpression(srcPath, this.tfInfo);
+        srcPath = Parser.processValue(srcPath, this.tfInfo);
 
         return { path: srcPath, range };
     }
@@ -343,17 +351,33 @@ class TerragruntNav {
                 repoUrl = `git@${url.hostname}:${urlPath}`;
             }
 
+            let repoName = urlPath.split('/').pop();
+            let repoDir = null;
+            console.log('Checking workspace folders for ' + repoName);
+            if (vscode.workspace.workspaceFolders) {
+                for (let folder of vscode.workspace.workspaceFolders) {
+                    console.log(folder.uri.fsPath);
+                    if (folder.uri.fsPath.endsWith(repoName)) {
+                        repoDir = folder.uri.fsPath;
+                        break;
+                    }
+                }
+            }
+
             let ref = match[5].trim().split('=')[1];
             let modulePath = match[4].trim();
 
-            let repoDir = path.join(this.terragruntRepoCache, urlPath);
             let clone = true;
-
-            const now = Date.now();
-            if (this.lastClonedMap.has(repoDir) && now - this.lastClonedMap.get(repoDir) < 30000) {
+            if (repoDir) {
                 clone = false;
             } else {
-                this.lastClonedMap.set(repoDir, now);
+                repoDir = path.join(this.terragruntRepoCache, urlPath);
+                const now = Date.now();
+                if (this.lastClonedMap.has(repoDir) && now - this.lastClonedMap.get(repoDir) < 30000) {
+                    clone = false;
+                } else {
+                    this.lastClonedMap.set(repoDir, now);
+                }
             }
 
             if (clone) {
@@ -511,9 +535,6 @@ function activate(context) {
 
 exports.activate = activate;
 
-function deactivate() {}
-
 module.exports = {
     activate,
-    deactivate,
 };

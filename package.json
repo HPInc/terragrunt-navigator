@@ -65,20 +65,24 @@
   },
   "dependencies": {
     "antlr4": "^4.13.2",
-    "npm-cli": "^0.1.0"
+    "jsep": "^1.3.9"
   },
   "description": "Navigate terragrunt/terrform code with Ctrl+click",
   "devDependencies": {
     "@babel/cli": "^7.24.8",
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
-    "vscode": "^1.1.34",
+    "@types/vscode": "^1.64.0",
+    "@vscode/test-electron": "^2.0.0",
+    "mkdirp": "^1.0.4",
+    "mocha": "^9.2.2",
+    "rimraf": "^4.0.0",
     "webpack": "^5.64.4",
     "webpack-cli": "^4.10.0"
   },
   "displayName": "Terragrunt/Terraform Navigator",
   "engines": {
-    "vscode": ">=1.63.0"
+    "vscode": ">=1.64.0"
   },
   "icon": "icon.png",
   "license": "MIT",
@@ -92,8 +96,8 @@
   "scripts": {
     "build:dev": "webpack --mode none",
     "build:prod": "webpack --mode production",
-    "compile": "java -jar /usr/local/lib/antlr-4.13.2-complete.jar -Dlanguage=JavaScript hcl.g4 -o generated -Xexact-output-dir -visitor && npx babel generated --out-dir generated-cjs",
+    "compile": "java -jar /usr/local/lib/antlr-4.13.2-complete.jar -Dlanguage=JavaScript hclLexer.g4 hclParser.g4 -o generated -Xexact-output-dir -visitor && npx babel generated --out-dir generated-cjs",
     "test": "node ./parser.js tests/env/region/cluster/terragrunt.hcl"
   },
-  "version": "0.4.0"
+  "version": "0.6.0"
 }

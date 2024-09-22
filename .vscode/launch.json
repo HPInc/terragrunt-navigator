@@ -22,7 +22,7 @@
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "program": "${workspaceFolder}/parser.js",
+      "program": "${workspaceFolder}/terragrunt.js",
       "args": [
         //"tests/env/region/cluster/terragrunt.hcl"
         "/root/op.hcl"
@@ -45,7 +45,7 @@
       "type": "antlr-debug",
       "request": "launch",
       "input": "/root/op.hcl",
-      "grammar": "${workspaceFolder}/hcl.g4",
+      "grammar": "${workspaceFolder}/hclParser.g4",
       "startRule": "configFile",
       "printParseTree": true,
       "visualParseTree": true
