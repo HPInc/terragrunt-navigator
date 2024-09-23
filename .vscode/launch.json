@@ -25,19 +25,8 @@
       "program": "${workspaceFolder}/terragrunt.js",
       "args": [
         //"tests/env/region/cluster/terragrunt.hcl"
+        "-f",
         "/root/op.hcl"
-      ]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Test App",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
-      "program": "${workspaceFolder}/test.js",
-      "args": [
-        "/tmp/a"
       ]
     },
     {

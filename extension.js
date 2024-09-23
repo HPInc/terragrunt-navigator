@@ -65,7 +65,7 @@ let rhsDecorator = vscode.window.createTextEditorDecorationType({
 class TerragruntNav {
     patterns = [
         {
-            pattern: /(source\s*=\s*")git::(ssh:\/\/|)(.*)\/\/([^#\r\n"?]+)\?([^#\r\n"]+)/,
+            pattern: /(source\s*=\s*")git::(ssh:\/\/|)(.*)\/\/([^#\r\n"?]+)(\?([^#\r\n"]+))?/,
             location: 'git',
         },
         {
@@ -82,6 +82,7 @@ class TerragruntNav {
     quickReplaceStringsCount = 1;
     getCodePath = '';
     tfInfo = {};
+    lastModulePath = null;
 
     constructor(context) {
         const repoCacheDir = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
@@ -196,28 +197,26 @@ class TerragruntNav {
         for (let line = 0; line < document.lineCount; line++) {
             let textLine = document.lineAt(line);
 
-            if (this.decorateLinks(linkDecorations, links, textLine, line)) {
+            try {
+                if (this.decorateLinks(linkDecorations, links, textLine.text, line)) {
+                    continue;
+                }
+            } catch (e) {
+                console.log('Failed to decorate links for ' + textLine.text + ': ' + e);
                 continue;
             }
 
+            let pattern = /\${(local|var|dependency)\.[^}]+}|(local|var|dependency)\.[a-zA-Z_][a-zA-Z0-9_.]*/g;
+            let match = textLine.text.match(pattern);
+            if (!match) {
+                continue;
+            }
             try {
-                let pattern =
-                    /\${(local|var|dependency|module)\.[^}]+}|(local|var|dependency|module)\.[a-zA-Z_][a-zA-Z0-9_.]*/g;
-                let match = textLine.text.match(pattern);
-                if (!match) {
-                    continue;
-                }
-
                 for (const element of match) {
                     let str = element.trim();
-                    let value = Parser.evalExpression(str, this.tfInfo);
-                    value = Parser.processValue(value, this.tfInfo);
-                    let range = new vscode.Range(
-                        line,
-                        textLine.text.indexOf(element),
-                        line,
-                        textLine.text.indexOf(element) + element.length,
-                    );
+                    let value = Parser.evalExpression(str, this.tfInfo, true);
+                    const sc = textLine.text.indexOf(element);
+                    let range = new vscode.Range(line, sc, line, sc + element.length);
                     let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
                     message.isTrusted = true;
                     rhsDecorations.push({ range: range, hoverMessage: message });
@@ -228,12 +227,12 @@ class TerragruntNav {
         }
     }
 
-    decorateLinks(linkDecorations, links, textLine, line) {
+    decorateLinks(linkDecorations, links, text, line) {
         let match = null;
         let location = null;
 
         for (let pattern of this.patterns) {
-            match = textLine.text.match(pattern.pattern);
+            match = text.match(pattern.pattern);
             location = pattern.location;
             if (match) {
                 break;
@@ -255,15 +254,22 @@ class TerragruntNav {
     }
 
     updateConfigs() {
+        const filePath = vscode.window.activeTextEditor.document.uri.fsPath;
         try {
+            const baseDir = path.dirname(filePath);
+            if (this.lastModulePath === baseDir) {
+                console.log('Already read terragrunt config for ' + baseDir);
+                return;
+            }
+            this.lastModulePath = baseDir;
             this.tfInfo = {
                 freshStart: true,
                 printTree: false,
                 traverse: Parser.traverse,
             };
-            console.log('Reading config for ' + vscode.window.activeTextEditor.document.uri.fsPath);
-            if (path.basename(vscode.window.activeTextEditor.document.uri.fsPath) === 'main.tf') {
-                let varFile = vscode.window.activeTextEditor.document.uri.fsPath.replace('main.tf', 'variables.tf');
+            console.log('Reading config for ' + filePath);
+            if (path.basename(filePath) === 'main.tf') {
+                let varFile = filePath.replace('main.tf', 'variables.tf');
                 if (fs.existsSync(varFile)) {
                     console.log('Reading variables for main.tf ' + varFile);
                     this.tfInfo.freshStart = true;
@@ -271,12 +277,9 @@ class TerragruntNav {
                 }
             }
             this.tfInfo.freshStart = true;
-            Terragrunt.read_terragrunt_config.apply(this.tfInfo, [
-                vscode.window.activeTextEditor.document.uri.fsPath,
-                this.tfInfo,
-            ]);
+            Terragrunt.read_terragrunt_config.apply(this.tfInfo, [filePath, this.tfInfo]);
         } catch (e) {
-            console.log('Failed to read terragrunt config: ' + e);
+            console.log('Failed to read terragrunt config for ' + filePath + ': ' + e);
         }
     }
 
@@ -302,8 +305,7 @@ class TerragruntNav {
                 srcPath = srcPath.replace(replacement.find, replacement.replace);
             }
         }
-        srcPath = Parser.evalExpression(srcPath, this.tfInfo);
-        srcPath = Parser.processValue(srcPath, this.tfInfo);
+        srcPath = Parser.evalExpression(srcPath, this.tfInfo, true);
 
         return { path: srcPath, range };
     }
@@ -334,79 +336,20 @@ class TerragruntNav {
 
         let uri = null;
         if (location === 'git') {
-            let repoUrl = match[3];
-            let url = null;
-            try {
-                let tmpUrl = repoUrl;
-                if (repoUrl.startsWith('git@')) {
-                    tmpUrl = repoUrl.replace(':', '/').replace('git@', 'https://');
-                }
-                url = new URL(tmpUrl.trim());
-            } catch (e) {
-                console.error('Failed to parse URL: ' + e);
-                return null;
-            }
-            const urlPath = url.pathname.replace(/\.git$/, '');
-            if (repoUrl.startsWith('git@')) {
-                repoUrl = `git@${url.hostname}:${urlPath}`;
-            }
-
-            let repoName = urlPath.split('/').pop();
-            let repoDir = null;
-            console.log('Checking workspace folders for ' + repoName);
-            if (vscode.workspace.workspaceFolders) {
-                for (let folder of vscode.workspace.workspaceFolders) {
-                    console.log(folder.uri.fsPath);
-                    if (folder.uri.fsPath.endsWith(repoName)) {
-                        repoDir = folder.uri.fsPath;
-                        break;
-                    }
-                }
-            }
-
-            let ref = match[5].trim().split('=')[1];
-            let modulePath = match[4].trim();
-
-            let clone = true;
-            if (repoDir) {
-                clone = false;
-            } else {
-                repoDir = path.join(this.terragruntRepoCache, urlPath);
-                const now = Date.now();
-                if (this.lastClonedMap.has(repoDir) && now - this.lastClonedMap.get(repoDir) < 30000) {
-                    clone = false;
-                } else {
-                    this.lastClonedMap.set(repoDir, now);
-                }
-            }
-
-            if (clone) {
-                try {
-                    vscode.window.showInformationMessage(`Cloning ${repoUrl} to ${repoDir}`);
-                    let cmd = `${this.getCodePath} ${repoUrl} ${ref} ${repoDir}`;
-                    if (os.platform() === 'win32') {
-                        cmd = `git-bash.exe ${cmd}`;
-                    } else {
-                        cmd = `bash ${cmd}`;
-                    }
-                    execSync(cmd, (error, stdout, stderr) => {
-                        if (error) {
-                            console.error(`exec error: ${error}`);
-                            vscode.window.showInformationMessage(`Error cloning repository: ${error}`);
-                        }
-                        console.log(`Repo cloned. stdout: ${stdout}`);
-                    });
-                } catch (error) {
-                    console.error(`exec error: ${error}`);
-                    vscode.window.showInformationMessage('Error cloning repository:', error);
-                }
-            }
-            let dir = path.join(repoDir, modulePath);
-            uri = vscode.Uri.file(dir);
+            let { repoUrl, ref, urlPath, modulePath, repoDir } = this.getRepoDetails(match);
+            uri = this.cloneRepo(repoUrl, ref, urlPath, modulePath, repoDir);
         } else {
             uri = vscode.Uri.file(result.path);
         }
 
+        if (uri && fs.lstatSync(uri.fsPath).isDirectory()) {
+            uri = this.openFileFromDirectory(uri);
+        }
+
+        return new vscode.Location(uri, new vscode.Position(0, 0));
+    }
+
+    openFileFromDirectory(uri) {
         if (uri && fs.lstatSync(uri.fsPath).isDirectory()) {
             let dir = uri.fsPath;
             const files = fs.readdirSync(dir);
@@ -414,8 +357,8 @@ class TerragruntNav {
                 return null;
             }
             let fileToOpen = null;
-            let validFilesList = ['terragrunt.hcl', 'main.tf'];
-            for (let file of validFilesList) {
+            let firstChoiseList = ['terragrunt.hcl', 'main.tf'];
+            for (let file of firstChoiseList) {
                 if (files.includes(file)) {
                     fileToOpen = path.join(dir, file);
                     break;
@@ -427,8 +370,83 @@ class TerragruntNav {
             uri = vscode.Uri.file(fileToOpen);
             vscode.commands.executeCommand('revealInExplorer', uri);
         }
+        return uri;
+    }
 
-        return new vscode.Location(uri, new vscode.Position(0, 0));
+    getRepoDetails(match) {
+        let repoUrl = match[3];
+        let ref = match[5] ? match[5].trim().split('=')[1] : '0';
+        let modulePath = match[4].trim();
+
+        let url = null;
+        try {
+            let tmpUrl = repoUrl;
+            if (repoUrl.startsWith('git@')) {
+                tmpUrl = repoUrl.replace(':', '/').replace('git@', 'https://');
+            }
+            url = new URL(tmpUrl.trim());
+        } catch (e) {
+            console.error('Failed to parse URL: ' + e);
+            return null;
+        }
+
+        const urlPath = url.pathname.replace(/(^\/|\.git$)/g, '');
+        if (repoUrl.startsWith('git@')) {
+            repoUrl = `git@${url.hostname}:${urlPath}`;
+        }
+
+        let repoName = urlPath.split('/').pop();
+        let repoDir = null;
+        console.log('Checking workspace folders for ' + repoName);
+        if (vscode.workspace.workspaceFolders) {
+            for (let folder of vscode.workspace.workspaceFolders) {
+                console.log(folder.uri.fsPath);
+                if (folder.uri.fsPath.endsWith(repoName)) {
+                    repoDir = folder.uri.fsPath;
+                    break;
+                }
+            }
+        }
+        return { repoUrl, ref, urlPath, modulePath, repoDir };
+    }
+
+    cloneRepo(repoUrl, ref, urlPath, modulePath, repoDir) {
+        let clone = true;
+        if (repoDir) {
+            clone = false;
+        } else {
+            repoDir = path.join(this.terragruntRepoCache, urlPath);
+            const now = Date.now();
+            if (this.lastClonedMap.has(repoDir) && now - this.lastClonedMap.get(repoDir) < 30000) {
+                clone = false;
+            } else {
+                this.lastClonedMap.set(repoDir, now);
+            }
+        }
+
+        if (clone) {
+            try {
+                vscode.window.showInformationMessage(`Cloning ${repoUrl} to ${repoDir}`);
+                let cmd = `${this.getCodePath} ${repoUrl} ${ref} ${repoDir}`;
+                if (os.platform() === 'win32') {
+                    cmd = `git-bash.exe ${cmd}`;
+                } else {
+                    cmd = `bash ${cmd}`;
+                }
+                execSync(cmd, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`exec error: ${error}`);
+                        vscode.window.showInformationMessage(`Error cloning repository: ${error}`);
+                    }
+                    console.log(`Repo cloned. stdout: ${stdout}`);
+                });
+            } catch (error) {
+                console.error(`exec error: ${error}`);
+                vscode.window.showInformationMessage('Error cloning repository:', error);
+            }
+        }
+        let dir = path.join(repoDir, modulePath);
+        return vscode.Uri.file(dir);
     }
 }
 

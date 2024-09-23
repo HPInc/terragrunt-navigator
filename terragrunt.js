@@ -3,6 +3,7 @@ const hclLexer = require('./generated-cjs/hclLexer').default;
 const hclParser = require('./generated-cjs/hclParser').default;
 const fs = require('fs');
 const path = require('path');
+const minimist = require('minimist');
 
 function get_aws_account_id() {
     if (process.env.AWS_ACCOUNT_ID) {
@@ -101,23 +102,23 @@ module.exports = Terragrunt;
 if (require.main === module) {
     const Parser = require('./parser');
 
+    const argv = minimist(process.argv.slice(2), {
+        boolean: ['printTree', 'printRange', 'allFiles'],
+        string: ['file'],
+        alias: { t: 'printTree', r: 'printRange', a: 'allFiles', f: 'file' },
+    });
+
     let tfInfo = {
         freshStart: true,
-        printTree: false,
+        printTree: argv.printTree || false,
         traverse: Parser.traverse,
+        configs: {
+            variable: {},
+        },
     };
 
     try {
-        let filePath = process.argv[2];
-        let printTree = false;
-        let printRange = false;
-        if (process.argv.length > 3) {
-            printTree = process.argv[3] === 'true';
-            tfInfo.printTree = printTree;
-        }
-        if (process.argv.length > 4) {
-            printRange = process.argv[4] === 'true';
-        }
+        let filePath = argv.file;
 
         if (!path.isAbsolute(filePath)) {
             filePath = path.resolve(filePath);
@@ -131,22 +132,26 @@ if (require.main === module) {
             console.log('Reading input file: ' + inputJson);
             let input = fs.readFileSync(inputJson, 'utf8');
             let inputs = JSON.parse(input);
-            tfInfo.configs.variable = Object.assign(tfInfo.configs.variable, inputs);
+            tfInfo.configs.variable = Object.assign(tfInfo.configs.variable, inputs['inputs']);
         }
 
-        // Read all the .tf files in the same directory
-        let files = fs.readdirSync(baseDir);
-        files.forEach((file) => {
-            let tfFile = path.join(baseDir, file);
-            if (file.endsWith('.tf') && tfFile !== filePath) {
-                tfInfo.freshStart = true;
-                read_terragrunt_config.apply(tfInfo, [tfFile, tfInfo]);
-            }
-        });
+        if (argv.allFiles) {
+            // Read all the .tf files in the same directory
+            let files = fs.readdirSync(baseDir);
+            files.forEach((file) => {
+                let tfFile = path.join(baseDir, file);
+                if (file.endsWith('.tf') && tfFile !== filePath) {
+                    tfInfo.freshStart = true;
+                    read_terragrunt_config.apply(tfInfo, [tfFile, tfInfo]);
+                }
+            });
+        }
+
         tfInfo.freshStart = true;
         read_terragrunt_config.apply(tfInfo, [filePath, tfInfo]);
+
         console.log(JSON.stringify(tfInfo.configs, null, 2));
-        if (printRange) {
+        if (argv.printRange) {
             console.log(JSON.stringify(tfInfo.ranges, null, 2));
         }
     } catch (e) {
