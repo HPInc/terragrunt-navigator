@@ -37,5 +37,7 @@ v0.6.0
 - Added initial support for quotedTemplate and heredoc
 - Fixed vulnerabilities
 
-v0.8.0
+v0.6.1
 - Improvements in code checkout
+- Support for getopt like commandline arguments
+- Bug fixes

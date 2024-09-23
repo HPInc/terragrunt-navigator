@@ -25,6 +25,7 @@
       "program": "${workspaceFolder}/terragrunt.js",
       "args": [
         //"tests/env/region/cluster/terragrunt.hcl"
+        "-f",
         "/root/op.hcl"
       ]
     },

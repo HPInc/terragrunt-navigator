@@ -51,7 +51,7 @@ function traverse(tfInfo, parser, node, configs, ranges, identInfo) {
             handleStringLiteral(tfInfo, parser, child, configs, ranges, identInfo);
         } else if (ruleName === undefined) {
             continue;
-        } else if (child.children) {
+        } else if (child.children && typeof child.children === 'object') {
             traverse(tfInfo, parser, child, configs, ranges, identInfo);
         }
     }
@@ -91,7 +91,7 @@ function handleBlock(tfInfo, parser, node, configs, ranges, identInfo) {
             continue;
         }
 
-        label = label.replace(/"/g, '');
+        label = unquote(label);
         // Avoid overwriting the block itself when block with same name is present.
         // For e.g. multiple variables section in the same file
         if (!configs.hasOwnProperty(label)) {
@@ -114,7 +114,7 @@ function handleAssign(tfInfo, parser, node, configs, ranges, identInfo) {
     const line = firstChild.start ? firstChild.start.line : node.start.line;
     const start = firstChild.start ? firstChild.start.column : node.start.column;
     const name = firstChild.getText();
-    const nodeIdentInfo = {
+    const nodeInfo = {
         name: name,
         blockType: identInfo?.blockType ? identInfo.blockType : 'argument',
         evalNeeded: false,
@@ -129,13 +129,16 @@ function handleAssign(tfInfo, parser, node, configs, ranges, identInfo) {
     };
 
     try {
-        traverse(tfInfo, parser, node, configs, ranges, nodeIdentInfo);
-        const ident = nodeIdentInfo.name;
-        if (nodeIdentInfo.evalNeeded) {
+        traverse(tfInfo, parser, node, configs, ranges, nodeInfo);
+        const ident = nodeInfo.name;
+        let val = configs[ident];
+        if (nodeInfo.evalNeeded) {
             tfInfo.contextBuffer = {};
-            configs[ident] = evalExpression(configs[ident], tfInfo);
+            val = evalExpression(val, tfInfo);
         }
-        configs[ident] = processValue(configs[ident], tfInfo);
+        val = processValue(val, tfInfo);
+        updateValue(tfInfo, configs, ident, val, true);
+        updateValue(tfInfo, ranges, ident, nodeInfo.range, true);
     } catch (e) {
         console.log('Error in argument: ' + e);
     }
@@ -211,8 +214,9 @@ function handleConditional(tfInfo, parser, node, configs, ranges, identInfo) {
     traverse(tfInfo, parser, node.children[4], obj, ranges, nodeInfo);
     let falseValue = evalExpression(obj.conditional, tfInfo);
     try {
-        configs[ident] = condition ? trueValue : falseValue;
-        ranges[ident] = identInfo.range;
+        let val = condition ? trueValue : falseValue;
+        updateValue(tfInfo, configs, ident, val, true);
+        updateValue(tfInfo, ranges, ident, identInfo.range, true);
     } catch (e) {
         console.log('Error in conditional: ' + node.getText() + ' Error: ' + e);
     }
@@ -238,14 +242,17 @@ function handleIndex(tfInfo, parser, node, configs, ranges, identInfo) {
 function handleAttrSplat(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let key = node.getText().split('.').pop();
-    let splatList = evalExpression(configs[ident], tfInfo);
-    configs[ident] = splatList.map((item) => item[key]);
+    let val = configs[ident];
+    let splatList = evalExpression(val, tfInfo);
+    val = splatList.map((item) => item[key]);
+    updateValue(tfInfo, configs, ident, val, true);
 }
 
 function handleFullSplat(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
-    let splatList = evalExpression(configs[ident], tfInfo);
-    configs[ident] = splatList;
+    let val = configs[ident];
+    let splatList = evalExpression(val, tfInfo);
+    updateValue(tfInfo, configs, ident, splatList, true);
 }
 
 function handleForTupleExpr(tfInfo, parser, node, configs, ranges, identInfo) {
@@ -287,8 +294,8 @@ function handleForTupleExpr(tfInfo, parser, node, configs, ranges, identInfo) {
             }
         });
 
-        configs[ident] = result;
-        ranges[ident] = identInfo.range;
+        updateValue(tfInfo, configs, ident, result, true);
+        updateValue(tfInfo, ranges, ident, identInfo.range, true);
     } catch (e) {
         console.log('Error in forTupleExpr: ' + e);
     }
@@ -336,8 +343,8 @@ function handleForObjectExpr(tfInfo, parser, node, configs, ranges, identInfo) {
             }
         });
 
-        configs[ident] = result;
-        ranges[ident] = identInfo.range;
+        updateValue(tfInfo, configs, ident, result, true);
+        updateValue(tfInfo, ranges, ident, identInfo.range, true);
     } catch (e) {
         console.log('Error in forObjectExpr: ' + e);
     }
@@ -357,8 +364,9 @@ function handleFunctionCall(tfInfo, parser, node, configs, ranges, identInfo) {
         funcString += '(args)';
         tfInfo.contextBuffer = { args: args };
     }
-    configs[ident] = evalExpression(funcString, tfInfo);
-    ranges[ident] = identInfo.range;
+    let val = evalExpression(funcString, tfInfo);
+    updateValue(tfInfo, configs, ident, val, true);
+    updateValue(tfInfo, ranges, ident, nodeInfo.range, true);
 }
 
 function handleFunctionArgs(tfInfo, parser, node, configs, ranges, identInfo) {
@@ -369,7 +377,7 @@ function handleFunctionArgs(tfInfo, parser, node, configs, ranges, identInfo) {
             let obj = { functionArgs: '' };
             traverse(tfInfo, parser, element, obj, ranges, nodeInfo);
             if (obj.functionArgs !== '') {
-                updateValue(tfInfo, configs, ident, obj.functionArgs, ',');
+                updateValue(tfInfo, configs, ident, obj.functionArgs, false, ',');
             }
         }
     }
@@ -393,7 +401,7 @@ function handleQuotedTemplate(tfInfo, parser, node, configs, ranges, identInfo) 
     let ident = identInfo.name;
     let value = node.getText();
     tfInfo.contextBuffer = {};
-    value = value.substring(1, value.length - 1);
+    value = unquote(value);
     if (identInfo.evalNeeded == undefined || identInfo.evalNeeded) {
         value = evalExpression(value, tfInfo);
     }
@@ -423,15 +431,12 @@ function evalExpression(exp, tfInfo, processOutput = false) {
             let key = match.substring(2, match.length - 1);
             let val = runEval(key, tfInfo, processOutput);
             if (typeof val === 'string' || typeof val === 'number') {
-                val = String(val).replace(/(^"|"$)/g, '');
+                val = unquote(String(val));
                 value = value.replace(match, val);
             }
         }
     } else {
-        value = runEval(value, tfInfo);
-    }
-    if (processOutput) {
-        value = processValue(value, tfInfo);
+        value = runEval(value, tfInfo, processOutput);
     }
     return value;
 }
@@ -439,15 +444,6 @@ function evalExpression(exp, tfInfo, processOutput = false) {
 function runEval(exp, tfInfo, processOutput = false) {
     let value = exp;
     try {
-        if (typeof exp === 'string') {
-            if (exp.includes('var.')) {
-                exp = exp.replace(/(var\.)([^. |\]}\r\n,]+)([^ |\]}\r\n,]*)/g, 'tfInfo.configs.variable.$2.default$3');
-            }
-            if (exp.includes('dependency.')) {
-                exp = exp.replace(/dependency\.([^.]+)\.outputs\./g, 'tfInfo.configs.dependency.$1.mock_outputs.');
-            }
-            exp = exp.replace(/try\(/g, 'tryTerraform(');
-        }
         let context = {
             path: tfInfo.path,
             terraform: tfInfo.terraform,
@@ -464,15 +460,26 @@ function runEval(exp, tfInfo, processOutput = false) {
             context = Object.assign(context, tfInfo.contextBuffer);
         }
 
+        if (typeof exp === 'string') {
+            if (exp.includes('var.')) {
+                exp = exp.replace(/(var\.)([^. |\]}\r\n,]+)([^ |\]}\r\n,]*)/g, 'tfInfo.configs.variable.$2.default$3');
+            }
+            if (exp.includes('dependency.')) {
+                exp = exp.replace(/dependency\.([^.]+)\.outputs\./g, 'tfInfo.configs.dependency.$1.mock_outputs.');
+            }
+            exp = exp.replace(/try\(/g, 'tryTerraform(');
+        }
+
         value = jsepEval(exp, context);
         if (typeof value === 'string') {
             value = quote(value);
         }
-        if (processOutput) {
-            value = processValue(value, tfInfo);
-        }
     } catch (e) {
         console.log('Failed to evaluate expression: ' + exp + ' Error: ' + e);
+    }
+
+    if (processOutput) {
+        value = processValue(value, tfInfo);
     }
     return value;
 }
@@ -484,7 +491,7 @@ function processValue(value, tfInfo) {
         } else if (!isNaN(value)) {
             value = Number(value);
         } else if (value.startsWith('"') && value.endsWith('"')) {
-            value = value.substring(1, value.length - 1);
+            value = unquote(value);
         } else if (value.startsWith('./') || value.startsWith('../')) {
             if (tfInfo.path?.root !== undefined) {
                 value = path.resolve(tfInfo.path.root, value);
@@ -603,9 +610,19 @@ function quote(value) {
     }
 }
 
-function updateValue(tfInfo, obj, key, value, separator = '') {
+function unquote(value) {
+    if (typeof value === 'string' && value.startsWith('"') && value.endsWith('"')) {
+        return value.substring(1, value.length - 1);
+    } else {
+        return value;
+    }
+}
+
+function updateValue(tfInfo, obj, key, value, overWrite = false, separator = '') {
     if (key !== undefined && obj !== undefined && key !== null && obj !== null) {
-        if (Array.isArray(obj[key])) {
+        if (overWrite) {
+            obj[key] = value;
+        } else if (Array.isArray(obj[key])) {
             value = processValue(value, tfInfo);
             obj[key].push(value);
         } else {

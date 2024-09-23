@@ -48,7 +48,7 @@ EOF
     { name = "instance3", type = "t2.large", active = true }
   ]
   names      = ["Alice", "Bob", "Charlie"]
-  kms_key_id = var.kms_key_id == null ? module.kms_key[10].key_id : var.kms_key_id
+  kms_key_id = var.kms_key_id == null ? module.kms_key[0].key_id : var.kms_key_id
   region_file = "region.hcl"
   region_vars1 = read_terragrunt_config(find_in_parent_folders("region.hcl"))
   region_vars2 = read_terragrunt_config(find_in_parent_folders(local.region_file))

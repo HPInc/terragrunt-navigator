@@ -54,6 +54,11 @@ basicLiterals
     | NULL
     ;
 
+boolean
+    : TRUE
+    | FALSE
+    ;
+
 stringLiteral
     : STRING_LITERAL
     ;
@@ -141,11 +146,6 @@ arithmeticOperator
 logicOperator
     : AND
     | OR
-    ;
-
-boolean
-    : TRUE
-    | FALSE
     ;
 
 // TODO: Add support for nested conditional
