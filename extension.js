@@ -178,26 +178,27 @@ class TerragruntNav {
         }
 
         for (let key in configs) {
-            if (ranges?.hasOwnProperty(key)) {
-                let value = configs[key];
-                let range = ranges[key];
-                if (Array.isArray(value) && Array.isArray(range)) {
-                    this.updateDecorations(decorations, value, range[range.length - 1]);
-                    for (let i = 0; i < value.length; i++) {
-                        let v = value[i];
-                        let r = range[i];
-                        if (typeof v === 'object' && v !== null) {
-                            this.decorateKeys(decorations, v, r);
-                        } else {
-                            this.updateDecorations(decorations, v, r);
-                        }
+            if (!ranges?.hasOwnProperty(key)) {
+                continue;
+            }
+            let value = configs[key];
+            let range = ranges[key];
+            if (Array.isArray(value) && Array.isArray(range)) {
+                this.updateDecorations(decorations, value, range[range.length - 1]);
+                for (let i = 0; i < value.length; i++) {
+                    let v = value[i];
+                    let r = range[i];
+                    if (typeof v === 'object' && v !== null) {
+                        this.decorateKeys(decorations, v, r);
+                    } else {
+                        this.updateDecorations(decorations, v, r);
                     }
-                } else if (typeof value === 'object' && value !== null) {
-                    this.updateDecorations(decorations, value, range);
-                    this.decorateKeys(decorations, value, range);
-                } else {
-                    this.updateDecorations(decorations, value, range);
                 }
+            } else if (typeof value === 'object' && value !== null) {
+                this.updateDecorations(decorations, value, range);
+                this.decorateKeys(decorations, value, range);
+            } else {
+                this.updateDecorations(decorations, value, range);
             }
         }
     }

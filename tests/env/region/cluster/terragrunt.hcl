@@ -26,7 +26,7 @@ EOF
   primary       = format("%s-%s-us", local.type, local.zone1)
   secondary     = format("%s-%s-us", local.type, local.zone2)
   add_failover  = true
-  cluster_names = local.add_failover ? [local.primary, local.secondary] : [local.primary]
+  cluster_names = local.add_failover ? [local.primary, local.secondary,] : [local.primary]
 
   # Unary operators and negative numbers
   negative_number  = -5

@@ -171,7 +171,7 @@ function handleTuple(tfInfo, parser, node, configs, ranges, identInfo) {
         configs[ident] = [];
         ranges[ident] = [];
     }
-    for (let ii = 1; ii < node.children.length; ii += 2) {
+    for (let ii = 1; ii < node.children.length - 1; ii += 2) {
         let child = node.children[ii];
         let obj = [];
         let objRanges = [];
