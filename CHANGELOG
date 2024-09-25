@@ -41,3 +41,7 @@ v0.6.1
 - Improvements in code checkout
 - Support for getopt like commandline arguments
 - Bug fixes
+
+v0.8.0
+- Improvement in function args handling
+- Improvement in identifing the ranges for object inside tuple

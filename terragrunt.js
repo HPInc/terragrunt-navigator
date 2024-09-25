@@ -90,6 +90,58 @@ function path_relative_from_include(includeName = null, configs = this.configs) 
     return relativePath;
 }
 
+function fetch_key_info(configs, ranges, depth = 0) {
+    if (configs === null || configs === undefined) {
+        return;
+    }
+
+    for (let key in configs) {
+        if (ranges?.hasOwnProperty(key)) {
+            let value = configs[key];
+            let range = ranges[key];
+            if (Array.isArray(value) && Array.isArray(range)) {
+                print_key_info(value, range[range.length - 1], depth);
+                for (let i = 0; i < value.length; i++) {
+                    let v = value[i];
+                    let r = range[i];
+                    if (typeof v === 'object' && v !== null) {
+                        fetch_key_info(v, r, depth + 1);
+                    } else {
+                        print_key_info(v, r, depth + 1);
+                    }
+                }
+            } else if (typeof value === 'object' && value !== null) {
+                print_key_info(value, range, depth);
+                fetch_key_info(value, range, depth + 1);
+            } else {
+                print_key_info(value, range, depth);
+            }
+        }
+    }
+}
+
+function print_key_info(value, range, depth) {
+    if (range?.hasOwnProperty('__range')) {
+        let r = range.__range;
+        let indent = ' '.repeat(depth * 2);
+        let message;
+
+        if (value === null) {
+            message = 'null';
+        } else if (typeof value === 'object') {
+            let jsonString = JSON.stringify(value, null, 2);
+            let jsonLines = jsonString.split('\n');
+            message = jsonLines.map((line) => indent + line).join('\n');
+        } else if (typeof value === 'string') {
+            message = `${indent}"${value}"`;
+        } else {
+            message = `${indent}${value.toString()}`;
+        }
+
+        console.log(`${message} => {${r.sl}, ${r.sc}, ${r.el}, ${r.ec}}`);
+    }
+}
+
 const Terragrunt = {
     get_aws_account_id,
     find_in_parent_folders,
@@ -103,9 +155,9 @@ if (require.main === module) {
     const Parser = require('./parser');
 
     const argv = minimist(process.argv.slice(2), {
-        boolean: ['printTree', 'printRange', 'allFiles'],
+        boolean: ['printTree', 'printRange', 'printKeyInfo', 'allFiles'],
         string: ['file'],
-        alias: { t: 'printTree', r: 'printRange', a: 'allFiles', f: 'file' },
+        alias: { t: 'printTree', r: 'printRange', k: 'printKeyInfo', f: 'file', a: 'allFiles' },
     });
 
     let tfInfo = {
@@ -153,6 +205,9 @@ if (require.main === module) {
         console.log(JSON.stringify(tfInfo.configs, null, 2));
         if (argv.printRange) {
             console.log(JSON.stringify(tfInfo.ranges, null, 2));
+        }
+        if (argv.printKeyInfo) {
+            fetch_key_info(tfInfo.configs, tfInfo.ranges);
         }
     } catch (e) {
         console.log('Failed to read terragrunt config: ' + e);

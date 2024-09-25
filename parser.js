@@ -11,7 +11,9 @@ function traverse(tfInfo, parser, node, configs, ranges, identInfo) {
     for (const child of node.children) {
         let ruleName = parser.ruleNames[child.ruleIndex];
 
-        if (ruleName === 'block') {
+        if (ruleName === undefined) {
+            continue;
+        } else if (ruleName === 'block') {
             handleBlock(tfInfo, parser, child, configs, ranges, identInfo);
         } else if (ruleName === 'argument' || ruleName === 'objectElement') {
             handleAssign(tfInfo, parser, child, configs, ranges, identInfo);
@@ -42,15 +44,13 @@ function traverse(tfInfo, parser, node, configs, ranges, identInfo) {
         } else if (ruleName == 'functionArgs') {
             handleFunctionArgs(tfInfo, parser, child, configs, ranges, identInfo);
         } else if (ruleName === 'basicLiterals' || ruleName === 'variableExpr' || ruleName === 'heredocContent') {
-            handleNonEvals(tfInfo, parser, child, configs, ranges, identInfo);
+            handleBasicTypes(tfInfo, parser, child, configs, ranges, identInfo);
         } else if (ruleName === 'boolean') {
             handleBoolean(tfInfo, parser, child, configs, ranges, identInfo);
         } else if (ruleName === 'quotedTemplate') {
             handleQuotedTemplate(tfInfo, parser, child, configs, ranges, identInfo);
         } else if (ruleName === 'stringLiteral') {
             handleStringLiteral(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === undefined) {
-            continue;
         } else if (child.children && typeof child.children === 'object') {
             traverse(tfInfo, parser, child, configs, ranges, identInfo);
         }
@@ -60,18 +60,13 @@ function traverse(tfInfo, parser, node, configs, ranges, identInfo) {
 function handleBlock(tfInfo, parser, node, configs, ranges, identInfo) {
     let firstChild = node.children[0];
     let blockType = firstChild.getText();
+    const sl = node.start.line - 1;
+    const sc = node.start.column;
     const nodeInfo = {
         name: blockType,
         blockType: blockType,
         evalNeeded: false,
-        range: {
-            __range: {
-                sl: node.start.line - 1,
-                sc: node.start.column,
-                el: node.start.line - 1,
-                ec: node.start.column + firstChild.getText().length,
-            },
-        },
+        range: { __range: { sl: sl, sc: sc, el: sl, ec: sc + firstChild.getText().length } },
     };
 
     let identifierCount = 0;
@@ -117,28 +112,21 @@ function handleAssign(tfInfo, parser, node, configs, ranges, identInfo) {
     const nodeInfo = {
         name: name,
         blockType: identInfo?.blockType ? identInfo.blockType : 'argument',
-        evalNeeded: false,
-        range: {
-            __range: {
-                sl: line - 1,
-                sc: start,
-                el: line - 1,
-                ec: start + name.length,
-            },
-        },
+        evalNeeded: true,
+        range: { __range: { sl: line - 1, sc: start, el: line - 1, ec: start + name.length } },
     };
 
     try {
-        traverse(tfInfo, parser, node, configs, ranges, nodeInfo);
+        traverse(tfInfo, parser, node.children[2], configs, ranges, nodeInfo);
         const ident = nodeInfo.name;
         let val = configs[ident];
-        if (nodeInfo.evalNeeded) {
+        if (nodeInfo.evalNeeded && typeof val === 'string') {
             tfInfo.contextBuffer = {};
-            val = evalExpression(val, tfInfo);
+            val = evalExpression(val, tfInfo, true);
+        } else {
+            val = processValue(val, tfInfo);
         }
-        val = processValue(val, tfInfo);
         updateValue(tfInfo, configs, ident, val, true);
-        updateValue(tfInfo, ranges, ident, nodeInfo.range, true);
     } catch (e) {
         console.log('Error in argument: ' + e);
     }
@@ -179,17 +167,26 @@ function handleObject(tfInfo, parser, node, configs, ranges, identInfo) {
 
 function handleTuple(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
-    if (Array.isArray(configs[ident])) {
-        let obj = [];
-        let objRanges = [];
-        traverse(tfInfo, parser, node, obj, objRanges, identInfo);
-        updateValue(tfInfo, configs, ident, obj);
-        updateValue(tfInfo, ranges, ident, objRanges);
-    } else {
+    if (!Array.isArray(configs[ident])) {
         configs[ident] = [];
         ranges[ident] = [];
-        traverse(tfInfo, parser, node, configs, ranges, identInfo);
     }
+    for (let ii = 1; ii < node.children.length; ii += 2) {
+        let child = node.children[ii];
+        let obj = [];
+        let objRanges = [];
+        let text = child.getText();
+        let sl = child.start.line - 1;
+        let sc = child.start.column;
+        let range = { __range: { sl: sl, sc: sc, el: sl, ec: sc + (text.length ?? 1) } };
+        const nodeInfo = { name: ident, blockType: identInfo.blockType, range: range };
+        traverse(tfInfo, parser, child, obj, objRanges, nodeInfo);
+        let val = evalExpression(obj[ident], tfInfo);
+        updateValue(tfInfo, configs, ident, val);
+        updateValue(tfInfo, ranges, ident, objRanges[ident]);
+    }
+    // Add range for the entire tuple at the end or the list
+    updateValue(tfInfo, ranges, ident, identInfo.range);
 }
 
 function handleOperator(tfInfo, parser, node, configs, ranges, identInfo) {
@@ -383,7 +380,7 @@ function handleFunctionArgs(tfInfo, parser, node, configs, ranges, identInfo) {
     }
 }
 
-function handleNonEvals(tfInfo, parser, node, configs, ranges, identInfo) {
+function handleBasicTypes(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let value = node.getText();
     updateValue(tfInfo, configs, ident, value);
@@ -492,10 +489,9 @@ function processValue(value, tfInfo) {
             value = Number(value);
         } else if (value.startsWith('"') && value.endsWith('"')) {
             value = unquote(value);
-        } else if (value.startsWith('./') || value.startsWith('../')) {
-            if (tfInfo.path?.root !== undefined) {
-                value = path.resolve(tfInfo.path.root, value);
-            }
+        }
+        if (typeof value === 'string' && (value.startsWith('./') || value.startsWith('../'))) {
+            value = path.resolve(tfInfo.path.root, value);
         }
     } else if (value === undefined) {
         value = 'undefined';

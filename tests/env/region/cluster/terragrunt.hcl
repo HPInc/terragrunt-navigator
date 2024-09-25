@@ -52,6 +52,11 @@ EOF
   region_file = "region.hcl"
   region_vars1 = read_terragrunt_config(find_in_parent_folders("region.hcl"))
   region_vars2 = read_terragrunt_config(find_in_parent_folders(local.region_file))
+  environment = "test"
+  tags = {
+    "Environment" : local.environment,
+    "Category" : format("Environment:Critical-%s", local.environment),
+  }
 }
 
 output "greetings" {

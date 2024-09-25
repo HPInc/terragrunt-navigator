@@ -179,7 +179,7 @@ variableExpr
     ;
 
 functionCall
-    : IDENTIFIER LPAREN functionArgs RPAREN
+    : IDENTIFIER LPAREN NEWLINE? functionArgs NEWLINE? RPAREN
     ;
 
 functionArgs
