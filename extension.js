@@ -173,23 +173,45 @@ class TerragruntNav {
     }
 
     decorateKeys(decorations, configs = {}, ranges = {}) {
+        if (configs === null || configs === undefined) {
+            return;
+        }
+
         for (let key in configs) {
-            if (ranges?.hasOwnProperty(key)) {
-                let value = configs[key];
-                let range = ranges[key];
-                if (range.hasOwnProperty('__range')) {
-                    let r = range.__range;
-                    let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
-                    message.isTrusted = true;
-                    decorations.push({
-                        range: new vscode.Range(r.sl, r.sc, r.el, r.ec),
-                        hoverMessage: message,
-                    });
-                }
-                if (typeof value === 'object' && value !== null) {
-                    this.decorateKeys(decorations, value, range);
-                }
+            if (!ranges?.hasOwnProperty(key)) {
+                continue;
             }
+            let value = configs[key];
+            let range = ranges[key];
+            if (Array.isArray(value) && Array.isArray(range)) {
+                this.updateDecorations(decorations, value, range[range.length - 1]);
+                for (let i = 0; i < value.length; i++) {
+                    let v = value[i];
+                    let r = range[i];
+                    if (typeof v === 'object' && v !== null) {
+                        this.decorateKeys(decorations, v, r);
+                    } else {
+                        this.updateDecorations(decorations, v, r);
+                    }
+                }
+            } else if (typeof value === 'object' && value !== null) {
+                this.updateDecorations(decorations, value, range);
+                this.decorateKeys(decorations, value, range);
+            } else {
+                this.updateDecorations(decorations, value, range);
+            }
+        }
+    }
+
+    updateDecorations(decorations, value, range) {
+        if (range.hasOwnProperty('__range')) {
+            let r = range.__range;
+            let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
+            message.isTrusted = true;
+            decorations.push({
+                range: new vscode.Range(r.sl, r.sc, r.el, r.ec),
+                hoverMessage: message,
+            });
         }
     }
 
@@ -547,6 +569,17 @@ function activate(context) {
         if (event.affectsConfiguration('terragrunt-navigator.featureToggles')) {
             let featureToggles = getFeatureTogglesConfig();
             terragruntNav.replaceStrings = featureToggles['ReplaceStrings'];
+        }
+    });
+
+    // Reset the cache when the document is changed
+    vscode.workspace.onDidChangeTextDocument((event) => {
+        const editor = vscode.window.activeTextEditor;
+        if (terragruntNav.lastModulePath && editor?.document) {
+            const dirPath = path.dirname(editor.document.uri.fsPath);
+            if (terragruntNav.lastModulePath === dirPath) {
+                terragruntNav.lastModulePath = null;
+            }
         }
     });
 }
