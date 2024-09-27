@@ -85,7 +85,7 @@ QUOTED_TEMPLATE
     ;
 
 STRING_LITERAL
-    : QUOTE (~[\r\n"])* QUOTE
+    : QUOTE (~[\r\n"\\] | '\\' .)* QUOTE
     ;
 
 NEWLINE

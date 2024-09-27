@@ -238,18 +238,47 @@ function handleIndex(tfInfo, parser, node, configs, ranges, identInfo) {
 
 function handleAttrSplat(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
-    let key = node.getText().split('.').pop();
+    let key = node.getText();
     let val = configs[ident];
+
     let splatList = evalExpression(val, tfInfo);
-    val = splatList.map((item) => item[key]);
+    if (key.includes('.*')) {
+        let attrs = key
+            .split(/\.?\*\./)
+            .slice(1)
+            .join('.')
+            .split('.');
+        val = splatList.map((item) => {
+            let result = item;
+            for (const attr of attrs) {
+                if (result && result[attr] !== undefined) {
+                    result = result[attr];
+                } else {
+                    result = undefined;
+                    break;
+                }
+            }
+            return result;
+        });
+    }
     updateValue(tfInfo, configs, ident, val, true);
 }
 
 function handleFullSplat(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let val = configs[ident];
+    tfInfo.contextBuffer = {};
     let splatList = evalExpression(val, tfInfo);
-    updateValue(tfInfo, configs, ident, splatList, true);
+    let result = splatList;
+    if (node.children.length > 3) {
+        let suffix = node.children[3].getText();
+        result = splatList.map((item) => {
+            let exp = `item${suffix}`;
+            tfInfo.contextBuffer = { item: item };
+            return evalExpression(exp, tfInfo, true);
+        });
+    }
+    updateValue(tfInfo, configs, ident, result, true);
 }
 
 function handleForTupleExpr(tfInfo, parser, node, configs, ranges, identInfo) {
@@ -514,7 +543,7 @@ function evaluateAst(node, context) {
         case 'UnaryExpression':
             return evaluateUnaryExpression(node, context);
         case 'MemberExpression':
-            return evaluateAst(node.object, context)[node.property.name];
+            return evaluateMemberExpression(node, context);
         case 'CallExpression':
             return evaluateCallExpression(node, context);
         case 'ConditionalExpression':
@@ -532,6 +561,24 @@ function evaluateAst(node, context) {
             return node.body.map((n) => evaluateAst(n, context)).pop();
         default:
             throw new Error(`Unsupported node type: ${node.type}`);
+    }
+}
+
+function evaluateMemberExpression(node, context) {
+    const object = evaluateAst(node.object, context);
+
+    if (node.property.type === 'Literal') {
+        return object[node.property.value];
+    } else if (node.property.type === 'Identifier') {
+        return object[node.property.name];
+    } else if (node.property.type === 'MemberExpression') {
+        return evaluateMemberExpression(node.property, object);
+    } else if (node.property.type === 'ArrayExpression') {
+        return node.property.elements.map((element) => evaluateAst(element, context));
+    } else if (node.property.type === 'SplatExpression') {
+        return object.map((item) => evaluateAst(node.property.expression, { ...context, item }));
+    } else {
+        throw new Error(`Unsupported property type: ${node.property.type}`);
     }
 }
 

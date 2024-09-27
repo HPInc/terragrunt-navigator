@@ -6,3 +6,5 @@
 /generated-cjs
 /.antlr
 input.json
+/tests/debug.txt
+/tests/output.txt

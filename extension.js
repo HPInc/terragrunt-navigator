@@ -571,6 +571,17 @@ function activate(context) {
             terragruntNav.replaceStrings = featureToggles['ReplaceStrings'];
         }
     });
+
+    // Reset the cache when the document is changed
+    vscode.workspace.onDidChangeTextDocument((event) => {
+        const editor = vscode.window.activeTextEditor;
+        if (terragruntNav.lastModulePath && editor?.document) {
+            const dirPath = path.dirname(editor.document.uri.fsPath);
+            if (terragruntNav.lastModulePath === dirPath) {
+                terragruntNav.lastModulePath = null;
+            }
+        }
+    });
 }
 
 exports.activate = activate;

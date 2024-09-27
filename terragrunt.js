@@ -138,7 +138,7 @@ function print_key_info(value, range, depth) {
             message = `${indent}${value.toString()}`;
         }
 
-        console.log(`${message} => {${r.sl}, ${r.sc}, ${r.el}, ${r.ec}}`);
+        console.error(`${message} => {${r.sl}, ${r.sc}, ${r.el}, ${r.ec}}`);
     }
 }
 
@@ -204,7 +204,7 @@ if (require.main === module) {
 
         console.log(JSON.stringify(tfInfo.configs, null, 2));
         if (argv.printRange) {
-            console.log(JSON.stringify(tfInfo.ranges, null, 2));
+            console.error(JSON.stringify(tfInfo.ranges, null, 2));
         }
         if (argv.printKeyInfo) {
             fetch_key_info(tfInfo.configs, tfInfo.ranges);

@@ -1,26 +1,19 @@
-v0.2.5
-- Initial Release
-- Support for cloning repo mentioned in source
-- Support for navigating to the folder/file mentionen in config_path, find_in_parent_folders
-- Highlight recognized keys and values with different color
-- Tooltip for recognized keys/values
-- Support for few terragrunt and terraform functions
-
-v0.2.7
-- Support for file with relative path
-- Support for unary and binary operations
+v0.8.0
+- Improvement in function args handling
+- Improvement in identifing the ranges for object inside tuple
+- Improved support for splat
+- Improved handling/discarding of cached config data
+- Improvements in code checkout
+- Support for \" in string
+- Support for getopt like commandline arguments
 - Bug fixes
 
-v0.2.8
-- Support for var.<name> to show the information about variables used
-- For every main.tf loaded, it looks for data.tf in the same directory and load if found
-
-v0.2.9
-- Support for highlighting variable
-- Bug fix for highlighting not available on some key/values
-
-v0.2.10
-- Fix for " inside the source like "${read_terragrunt_config(find_in_parent_folders("vpc.hcl")).locals.version}"
+v0.6.0
+- Improved support for for expression, for expression, strings, objects
+- Support for opening the repo folder from the workspace(instead of cache) if its already added
+- Added initial support for splat
+- Added initial support for quotedTemplate and heredoc
+- Fixed vulnerabilities
 
 v0.4.0
 - Rewrittern parser from scratch
@@ -30,18 +23,26 @@ v0.4.0
 - Initial support for "for var in" for list and maps
 - Added test case for basic validation
 
-v0.6.0
-- Improved support for for expression, for expression, strings, objects
-- Support for opening the repo folder from the workspace(instead of cache) if its already added
-- Added initial support for splat
-- Added initial support for quotedTemplate and heredoc
-- Fixed vulnerabilities
+v0.2.10
+- Fix for " inside the source like "${read_terragrunt_config(find_in_parent_folders("vpc.hcl")).locals.version}"
 
-v0.6.1
-- Improvements in code checkout
-- Support for getopt like commandline arguments
+v0.2.9
+- Support for highlighting variable
+- Bug fix for highlighting not available on some key/values
+
+v0.2.8
+- Support for var.<name> to show the information about variables used
+- For every main.tf loaded, it looks for data.tf in the same directory and load if found
+
+v0.2.7
+- Support for file with relative path
+- Support for unary and binary operations
 - Bug fixes
 
-v0.8.0
-- Improvement in function args handling
-- Improvement in identifing the ranges for object inside tuple
+v0.2.5
+- Initial Release
+- Support for cloning repo mentioned in source
+- Support for navigating to the folder/file mentionen in config_path, find_in_parent_folders
+- Highlight recognized keys and values with different color
+- Tooltip for recognized keys/values
+- Support for few terragrunt and terraform functions
