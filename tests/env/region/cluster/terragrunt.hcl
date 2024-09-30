@@ -66,7 +66,7 @@ EOF
   user_names = ["Alice", "Bob", "Charlie"]
 
   # Conditional expressions
-  kms_key_id = var.kms_key_id == null ? module.kms_key[0].key_id : var.kms_key_id
+  kms_key_id = local.is_production ? "production-key" : "development-key"
 
   region_file = "region.hcl"
   region_vars = read_terragrunt_config(find_in_parent_folders(local.region_file))
@@ -123,32 +123,19 @@ EOF
 
   # Splats
   full_splat = local.network_config.instances[*].tags[0]
-  attr_splat = local.complex_structure.foo.*.test
-}
+  attr_splat = local.complex_structure.*.foo.sub.test.value
 
-output "greetings" {
-  # forTuple
-  value = [for name in local.user_names : "Hello, ${name}!" if name == "Bob"]
-}
-
-output "active_server_instances" {
-  # forObject
-  value = {
-    for instance in local.server_instances : instance.name => instance.type if instance.active
-  }
+  forTuple = [ for name in local.user_names : "Hello, ${name}!" if name == "Bob" ]
+  forObject = { for instance in local.server_instances : instance.name => instance.type if instance.active }
 }
 
 inputs = {
   region_code = "us-east-1"
 }
 
-variable "name" {
-  type = string
-  default = "world"
-}
-
 dependency "vpc" {
   config_path = "../../vpc"
+  skip_outputs = true
 }
 
 include {

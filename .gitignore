@@ -8,3 +8,7 @@
 input.json
 /tests/debug.txt
 /tests/output.txt
+.terragrunt-cache
+.terraform
+.terraform.lock.hcl
+terragrunt-debug.tfvars.json

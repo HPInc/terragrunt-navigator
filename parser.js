@@ -3,54 +3,53 @@ const Terraform = require('./terraform');
 const path = require('path');
 const jsep = require('jsep');
 
-function traverse(tfInfo, parser, node, configs, ranges, identInfo) {
-    if (!node?.children || typeof node.children !== 'object') {
-        return;
+jsep.addBinaryOp('*', 10);
+jsep.hooks.add('gobble-token', function (env) {
+    if (env.node && env.node.type === 'BinaryExpression' && env.node.operator === '*') {
+        if (env.node.left && env.node.left.type === 'MemberExpression') {
+            env.node.type = 'AttributeSplatExpression';
+            env.node.operator = null;
+        } else if (env.node.left && env.node.left.type === 'ArrayExpression') {
+            env.node.type = 'FullSplatExpression';
+            env.node.operator = null;
+        }
     }
+});
 
+const ruleHandlers = {
+    block: handleBlock,
+    argument: handleAssign,
+    objectElement: handleAssign,
+    object: handleObject,
+    tuple: handleTuple,
+    unaryOperation: handleOperation,
+    binaryOperation: handleOperation,
+    conditional: handleOperation,
+    getAttr: handleGetAttr,
+    index: handleIndex,
+    attrSplat: handleAttrSplat,
+    fullSplat: handleFullSplat,
+    forTupleExpr: handleForTupleExpr,
+    forObjectExpr: handleForObjectExpr,
+    functionCall: handleFunctionCall,
+    basicLiterals: handleBasicTypes,
+    variableExpr: handleBasicTypes,
+    heredocContent: handleBasicTypes,
+    boolean: handleBoolean,
+    quotedTemplate: handleQuotedTemplate,
+    stringLiteral: handleStringLiteral,
+};
+
+function traverse(tfInfo, parser, node, configs, ranges, identInfo) {
     for (const child of node.children) {
-        let ruleName = parser.ruleNames[child.ruleIndex];
-
+        const ruleName = parser.ruleNames[child.ruleIndex];
         if (ruleName === undefined) {
             continue;
-        } else if (ruleName === 'block') {
-            handleBlock(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'argument' || ruleName === 'objectElement') {
-            handleAssign(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'expression') {
-            handleExpression(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'object') {
-            handleObject(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'tuple') {
-            handleTuple(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'unaryOperator' || ruleName === 'binaryOperator') {
-            handleOperator(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'conditional') {
-            handleConditional(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'getAttr') {
-            handleGetAttr(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'index') {
-            handleIndex(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'attrSplat') {
-            handleAttrSplat(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'fullSplat') {
-            handleFullSplat(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'forTupleExpr') {
-            handleForTupleExpr(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'forObjectExpr') {
-            handleForObjectExpr(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'functionCall') {
-            handleFunctionCall(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName == 'functionArgs') {
-            handleFunctionArgs(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'basicLiterals' || ruleName === 'variableExpr' || ruleName === 'heredocContent') {
-            handleBasicTypes(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'boolean') {
-            handleBoolean(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'quotedTemplate') {
-            handleQuotedTemplate(tfInfo, parser, child, configs, ranges, identInfo);
-        } else if (ruleName === 'stringLiteral') {
-            handleStringLiteral(tfInfo, parser, child, configs, ranges, identInfo);
+        }
+
+        const handler = ruleHandlers[ruleName];
+        if (handler) {
+            handler(tfInfo, parser, child, configs, ranges, identInfo);
         } else if (child.children && typeof child.children === 'object') {
             traverse(tfInfo, parser, child, configs, ranges, identInfo);
         }
@@ -86,7 +85,7 @@ function handleBlock(tfInfo, parser, node, configs, ranges, identInfo) {
             continue;
         }
 
-        label = unquote(label);
+        label = processString(label);
         // Avoid overwriting the block itself when block with same name is present.
         // For e.g. multiple variables section in the same file
         if (!configs.hasOwnProperty(label)) {
@@ -109,8 +108,9 @@ function handleAssign(tfInfo, parser, node, configs, ranges, identInfo) {
     const line = firstChild.start ? firstChild.start.line : node.start.line;
     const start = firstChild.start ? firstChild.start.column : node.start.column;
     const name = firstChild.getText();
+    const ident = processString(name);
     const nodeInfo = {
-        name: name,
+        name: ident,
         blockType: identInfo?.blockType ? identInfo.blockType : 'argument',
         evalNeeded: true,
         range: { __range: { sl: line - 1, sc: start, el: line - 1, ec: start + name.length } },
@@ -118,31 +118,11 @@ function handleAssign(tfInfo, parser, node, configs, ranges, identInfo) {
 
     try {
         traverse(tfInfo, parser, node.children[2], configs, ranges, nodeInfo);
-        const ident = nodeInfo.name;
         let val = configs[ident];
-        if (nodeInfo.evalNeeded && typeof val === 'string') {
-            tfInfo.contextBuffer = {};
-            val = evalExpression(val, tfInfo, true);
-        } else {
-            val = processValue(val, tfInfo);
-        }
         updateValue(tfInfo, configs, ident, val, true);
     } catch (e) {
         console.log('Error in argument: ' + e);
     }
-}
-
-function handleExpression(tfInfo, parser, node, configs, ranges, identInfo) {
-    let ident = identInfo.name;
-    let obj = {};
-    let objRanges = {};
-    const nodeInfo = { name: 'expression', blockType: identInfo.blockType, range: identInfo.range };
-    traverse(tfInfo, parser, node, obj, objRanges, nodeInfo);
-    let value = obj.expression;
-    tfInfo.contextBuffer = {};
-    value = nodeInfo.evalNeeded ? evalExpression(value, tfInfo) : processValue(value, tfInfo);
-    updateValue(tfInfo, configs, ident, value);
-    updateValue(tfInfo, ranges, ident, objRanges.expression);
 }
 
 function handleObject(tfInfo, parser, node, configs, ranges, identInfo) {
@@ -181,49 +161,30 @@ function handleTuple(tfInfo, parser, node, configs, ranges, identInfo) {
         let range = { __range: { sl: sl, sc: sc, el: sl, ec: sc + (text.length ?? 1) } };
         const nodeInfo = { name: ident, blockType: identInfo.blockType, range: range };
         traverse(tfInfo, parser, child, obj, objRanges, nodeInfo);
-        let val = evalExpression(obj[ident], tfInfo);
-        updateValue(tfInfo, configs, ident, val);
+        updateValue(tfInfo, configs, ident, obj[ident]);
         updateValue(tfInfo, ranges, ident, objRanges[ident]);
     }
     // Add range for the entire tuple at the end or the list
     updateValue(tfInfo, ranges, ident, identInfo.range);
 }
 
-function handleOperator(tfInfo, parser, node, configs, ranges, identInfo) {
+function handleOperation(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let value = node.getText();
+    value = evalExpression(value, tfInfo, true);
     updateValue(tfInfo, configs, ident, value);
-    traverse(tfInfo, parser, node, configs, ranges, identInfo);
-    identInfo.evalNeeded = true;
-}
-
-function handleConditional(tfInfo, parser, node, configs, ranges, identInfo) {
-    let ident = identInfo.name;
-    let obj = {};
-    const nodeInfo = { name: 'conditional', blockType: identInfo.blockType, range: identInfo.range };
-    traverse(tfInfo, parser, node.children[0], obj, ranges, nodeInfo);
-    tfInfo.contextBuffer = {};
-    let condition = evalExpression(obj.conditional, tfInfo);
-    obj = {};
-    traverse(tfInfo, parser, node.children[2], obj, ranges, nodeInfo);
-    let trueValue = evalExpression(obj.conditional, tfInfo);
-    obj = {};
-    traverse(tfInfo, parser, node.children[4], obj, ranges, nodeInfo);
-    let falseValue = evalExpression(obj.conditional, tfInfo);
-    try {
-        let val = condition ? trueValue : falseValue;
-        updateValue(tfInfo, configs, ident, val, true);
-        updateValue(tfInfo, ranges, ident, identInfo.range, true);
-    } catch (e) {
-        console.log('Error in conditional: ' + node.getText() + ' Error: ' + e);
-    }
+    updateValue(tfInfo, ranges, ident, identInfo.range);
 }
 
 function handleGetAttr(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let attr = node.getText();
-    updateValue(tfInfo, configs, ident, attr);
-    identInfo.evalNeeded = true;
+    let exp = configs[ident] + attr;
+    let val = exp;
+    if (identInfo.evalNeeded) {
+        val = evalExpression(exp, tfInfo, true);
+    }
+    updateValue(tfInfo, configs, ident, val, true);
 }
 
 function handleIndex(tfInfo, parser, node, configs, ranges, identInfo) {
@@ -377,27 +338,21 @@ function handleForObjectExpr(tfInfo, parser, node, configs, ranges, identInfo) {
 }
 
 function handleFunctionCall(tfInfo, parser, node, configs, ranges, identInfo) {
-    let ident = identInfo.name;
-    const nodeInfo = { name: 'functionCall', blockType: identInfo.blockType, range: identInfo.range };
-    let funcName = node.children[0].getText();
-    let obj = {};
-    traverse(tfInfo, parser, node, obj, ranges, nodeInfo);
-    let args = obj.functionCall !== undefined ? obj.functionCall : '';
-    let funcString = funcName;
-    if (typeof args === 'string') {
-        funcString += '(' + args + ')';
-    } else {
-        funcString += '(args)';
-        tfInfo.contextBuffer = { args: args };
-    }
-    let val = evalExpression(funcString, tfInfo);
+    const ident = identInfo.name;
+    let exp = node.getText();
+    let val = evalExpression(exp, tfInfo, true);
     updateValue(tfInfo, configs, ident, val, true);
-    updateValue(tfInfo, ranges, ident, nodeInfo.range, true);
+    updateValue(tfInfo, ranges, ident, identInfo.range, true);
 }
 
 function handleFunctionArgs(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
-    const nodeInfo = { name: 'functionArgs', blockType: identInfo.blockType, range: identInfo.range };
+    const nodeInfo = {
+        name: 'functionArgs',
+        blockType: identInfo.blockType,
+        range: identInfo.range,
+        evalNeeded: false,
+    };
     if (node.children) {
         for (const element of node.children) {
             let obj = { functionArgs: '' };
@@ -412,6 +367,7 @@ function handleFunctionArgs(tfInfo, parser, node, configs, ranges, identInfo) {
 function handleBasicTypes(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let value = node.getText();
+    value = processValue(value, tfInfo);
     updateValue(tfInfo, configs, ident, value);
     ranges[ident] = identInfo.range;
 }
@@ -427,7 +383,7 @@ function handleQuotedTemplate(tfInfo, parser, node, configs, ranges, identInfo) 
     let ident = identInfo.name;
     let value = node.getText();
     tfInfo.contextBuffer = {};
-    value = unquote(value);
+    value = processString(value);
     if (identInfo.evalNeeded == undefined || identInfo.evalNeeded) {
         value = evalExpression(value, tfInfo);
     }
@@ -438,8 +394,7 @@ function handleQuotedTemplate(tfInfo, parser, node, configs, ranges, identInfo) 
 function handleStringLiteral(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let value = node.getText();
-    tfInfo.contextBuffer = {};
-    value = evalExpression(value, tfInfo);
+    value = processString(value, tfInfo);
     updateValue(tfInfo, configs, ident, value);
     ranges[ident] = identInfo.range;
 }
@@ -457,7 +412,7 @@ function evalExpression(exp, tfInfo, processOutput = false) {
             let key = match.substring(2, match.length - 1);
             let val = runEval(key, tfInfo, processOutput);
             if (typeof val === 'string' || typeof val === 'number') {
-                val = unquote(String(val));
+                val = processString(String(val));
                 value = value.replace(match, val);
             }
         }
@@ -497,9 +452,6 @@ function runEval(exp, tfInfo, processOutput = false) {
         }
 
         value = jsepEval(exp, context);
-        if (typeof value === 'string') {
-            value = quote(value);
-        }
     } catch (e) {
         console.log('Failed to evaluate expression: ' + exp + ' Error: ' + e);
     }
@@ -517,7 +469,7 @@ function processValue(value, tfInfo) {
         } else if (!isNaN(value)) {
             value = Number(value);
         } else if (value.startsWith('"') && value.endsWith('"')) {
-            value = unquote(value);
+            value = processString(value);
         }
         if (typeof value === 'string' && (value.startsWith('./') || value.startsWith('../'))) {
             value = path.resolve(tfInfo.path.root, value);
@@ -576,6 +528,8 @@ function evaluateMemberExpression(node, context) {
     } else if (node.property.type === 'ArrayExpression') {
         return node.property.elements.map((element) => evaluateAst(element, context));
     } else if (node.property.type === 'SplatExpression') {
+        return object.map((item) => evaluateAst(node.property.expression, { ...context, item }));
+    } else if (node.property.type === 'AttributeSplatExpression') {
         return object.map((item) => evaluateAst(node.property.expression, { ...context, item }));
     } else {
         throw new Error(`Unsupported property type: ${node.property.type}`);
@@ -653,12 +607,23 @@ function quote(value) {
     }
 }
 
-function unquote(value) {
-    if (typeof value === 'string' && value.startsWith('"') && value.endsWith('"')) {
-        return value.substring(1, value.length - 1);
-    } else {
+function processString(value, tfInfo = {}) {
+    if (typeof value !== 'string') {
         return value;
     }
+    if (value.includes('\\"')) {
+        value = value.replace(/\\"/g, '"');
+    }
+
+    if (value.startsWith('"') && value.endsWith('"')) {
+        value = value.substring(1, value.length - 1);
+    }
+
+    if (tfInfo && (value.startsWith('./') || value.startsWith('../'))) {
+        value = path.resolve(tfInfo.path.root, value);
+    }
+
+    return value;
 }
 
 function updateValue(tfInfo, obj, key, value, overWrite = false, separator = '') {
@@ -666,7 +631,6 @@ function updateValue(tfInfo, obj, key, value, overWrite = false, separator = '')
         if (overWrite) {
             obj[key] = value;
         } else if (Array.isArray(obj[key])) {
-            value = processValue(value, tfInfo);
             obj[key].push(value);
         } else {
             obj[key] = obj[key] === undefined ? value : obj[key] + separator + value;
