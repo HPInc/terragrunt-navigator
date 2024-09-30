@@ -74,14 +74,6 @@
         }
       }
     ],
-    "functionArgs": {
-      "__range": {
-        "sl": 71,
-        "sc": 2,
-        "el": 71,
-        "ec": 13
-      }
-    },
     "extended_numbers_list": {
       "__range": {
         "sl": 12,
@@ -226,14 +218,6 @@
         "sc": 2,
         "el": 33,
         "ec": 18
-      }
-    },
-    "conditional": {
-      "__range": {
-        "sl": 68,
-        "sc": 2,
-        "el": 68,
-        "ec": 12
       }
     },
     "region_list": {
@@ -543,7 +527,7 @@
         "el": 74,
         "ec": 15
       },
-      "\"Environment\"": {
+      "Environment": {
         "__range": {
           "sl": 75,
           "sc": 4,
@@ -551,15 +535,7 @@
           "ec": 17
         }
       },
-      "functionArgs": {
-        "__range": {
-          "sl": 76,
-          "sc": 4,
-          "el": 76,
-          "ec": 14
-        }
-      },
-      "\"Category\"": {
+      "Category": {
         "__range": {
           "sl": 76,
           "sc": 4,
@@ -615,7 +591,7 @@
                 "el": 86,
                 "ec": 30
               },
-              "\"type\"": {
+              "type": {
                 "__range": {
                   "sl": 86,
                   "sc": 18,
@@ -631,7 +607,7 @@
                 "el": 86,
                 "ec": 51
               },
-              "\"type\"": {
+              "type": {
                 "__range": {
                   "sl": 86,
                   "sc": 38,
@@ -689,7 +665,7 @@
                 "el": 92,
                 "ec": 29
               },
-              "\"type\"": {
+              "type": {
                 "__range": {
                   "sl": 92,
                   "sc": 18,
@@ -705,7 +681,7 @@
                 "el": 92,
                 "ec": 50
               },
-              "\"type\"": {
+              "type": {
                 "__range": {
                   "sl": 92,
                   "sc": 37,
@@ -763,7 +739,7 @@
                 "el": 98,
                 "ec": 30
               },
-              "\"type\"": {
+              "type": {
                 "__range": {
                   "sl": 98,
                   "sc": 18,
@@ -779,7 +755,7 @@
                 "el": 98,
                 "ec": 50
               },
-              "\"type\"": {
+              "type": {
                 "__range": {
                   "sl": 98,
                   "sc": 38,
@@ -950,6 +926,22 @@
         "ec": 12
       }
     },
+    "forTuple": {
+      "__range": {
+        "sl": 127,
+        "sc": 2,
+        "el": 127,
+        "ec": 10
+      }
+    },
+    "forObject": {
+      "__range": {
+        "sl": 128,
+        "sc": 2,
+        "el": 128,
+        "ec": 11
+      }
+    },
     "__range": {
       "sl": 4,
       "sc": 0,
@@ -957,79 +949,19 @@
       "ec": 6
     }
   },
-  "output": {
-    "greetings": {
-      "value": {
-        "__range": {
-          "sl": 130,
-          "sc": 2,
-          "el": 130,
-          "ec": 7
-        }
-      },
-      "__range": {
-        "sl": 128,
-        "sc": 0,
-        "el": 128,
-        "ec": 6
-      }
-    },
-    "active_server_instances": {
-      "value": {
-        "__range": {
-          "sl": 135,
-          "sc": 2,
-          "el": 135,
-          "ec": 7
-        }
-      },
-      "__range": {
-        "sl": 133,
-        "sc": 0,
-        "el": 133,
-        "ec": 6
-      }
-    }
-  },
   "inputs": {
     "__range": {
-      "sl": 140,
+      "sl": 131,
       "sc": 0,
-      "el": 140,
+      "el": 131,
       "ec": 6
     },
     "region_code": {
       "__range": {
-        "sl": 141,
+        "sl": 132,
         "sc": 2,
-        "el": 141,
+        "el": 132,
         "ec": 13
-      }
-    }
-  },
-  "variable": {
-    "name": {
-      "type": {
-        "__range": {
-          "sl": 145,
-          "sc": 2,
-          "el": 145,
-          "ec": 6
-        }
-      },
-      "default": {
-        "__range": {
-          "sl": 146,
-          "sc": 2,
-          "el": 146,
-          "ec": 9
-        }
-      },
-      "__range": {
-        "sl": 144,
-        "sc": 0,
-        "el": 144,
-        "ec": 8
       }
     }
   },
@@ -1037,16 +969,24 @@
     "vpc": {
       "config_path": {
         "__range": {
-          "sl": 150,
+          "sl": 136,
           "sc": 2,
-          "el": 150,
+          "el": 136,
           "ec": 13
         }
       },
+      "skip_outputs": {
+        "__range": {
+          "sl": 137,
+          "sc": 2,
+          "el": 137,
+          "ec": 14
+        }
+      },
       "__range": {
-        "sl": 149,
+        "sl": 135,
         "sc": 0,
-        "el": 149,
+        "el": 135,
         "ec": 10
       }
     }
@@ -1054,26 +994,20 @@
   "include": {
     "path": {
       "__range": {
-        "sl": 154,
+        "sl": 141,
         "sc": 2,
-        "el": 154,
+        "el": 141,
         "ec": 6
       }
     },
     "__range": {
-      "sl": 153,
+      "sl": 140,
       "sc": 0,
-      "el": 153,
+      "el": 140,
       "ec": 7
     }
   }
 }
-  {
-    "type": "string",
-    "default": "world"
-  } => {144, 0, 144, 8}
-    "string" => {145, 2, 145, 6}
-    "world" => {146, 2, 146, 9}
 {
   "source": "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git//modules/aws-auth?ref=v20.24.0"
 } => {0, 0, 0, 9}
@@ -1108,9 +1042,9 @@
   ],
   "regex_pattern": "^(?:[A-Za-z0-9+/]{2})*(?:[A-Za-z0-9+/][NSD]==|[A-Za-z0-9+/]{2}[AFASDASDcgkosw048]=)?$",
   "quoted_template": "prefix-shop-suffix",
-  "quotes_template": "prefix-shop-suffix",
+  "quotes_template": "\"prefix-shop-suffix\"",
   "quotes_string": ":\"START\" => END\"",
-  "quotes_string2": "START",
+  "quotes_string2": "\"START\"",
   "multiline_string": "This is a heredoc\nIt spans multiple lines\n",
   "primary_region": "shop-mst-us",
   "secondary_region": "shop-pst-us",
@@ -1156,7 +1090,7 @@
     "Bob",
     "Charlie"
   ],
-  "kms_key_id": "module.kms_key[0].key_id",
+  "kms_key_id": "development-key",
   "region_file": "region.hcl",
   "region_vars": {
     "locals": {
@@ -1165,8 +1099,8 @@
   },
   "environment_name": "test",
   "resource_tags": {
-    "\"Environment\"": "test",
-    "\"Category\"": "Production:Critical-test"
+    "Environment": "test",
+    "Category": "Production:Critical-test"
   },
   "network_config": {
     "instances": [
@@ -1176,10 +1110,10 @@
         "hostname": "host1",
         "tags": [
           {
-            "\"type\"": "web"
+            "type": "web"
           },
           {
-            "\"type\"": "prod"
+            "type": "prod"
           }
         ]
       },
@@ -1189,10 +1123,10 @@
         "hostname": "host2",
         "tags": [
           {
-            "\"type\"": "db"
+            "type": "db"
           },
           {
-            "\"type\"": "prod"
+            "type": "prod"
           }
         ]
       },
@@ -1202,10 +1136,10 @@
         "hostname": "host3",
         "tags": [
           {
-            "\"type\"": "web"
+            "type": "web"
           },
           {
-            "\"type\"": "dev"
+            "type": "dev"
           }
         ]
       }
@@ -1239,16 +1173,32 @@
   ],
   "full_splat": [
     {
-      "\"type\"": "web"
+      "type": "web"
     },
     {
-      "\"type\"": "db"
+      "type": "db"
     },
     {
-      "\"type\"": "web"
+      "type": "web"
     }
   ],
-  "attr_splat": "local.complex_structure.foo"
+  "attr_splat": [
+    [
+      "test1",
+      "test2"
+    ],
+    [
+      "test3",
+      "test4"
+    ]
+  ],
+  "forTuple": [
+    "Hello, Bob!"
+  ],
+  "forObject": {
+    "server1": "t2.micro",
+    "server3": "t2.large"
+  }
 } => {4, 0, 4, 6}
   "shop" => {6, 2, 6, 14}
   "mst" => {7, 2, 7, 14}
@@ -1286,9 +1236,9 @@
     "value2" => {16, 6, 16, 9}
   "^(?:[A-Za-z0-9+/]{2})*(?:[A-Za-z0-9+/][NSD]==|[A-Za-z0-9+/]{2}[AFASDASDcgkosw048]=)?$" => {20, 2, 20, 15}
   "prefix-shop-suffix" => {21, 2, 21, 17}
-  "prefix-shop-suffix" => {22, 2, 22, 17}
+  ""prefix-shop-suffix"" => {22, 2, 22, 17}
   ":"START" => END"" => {23, 2, 23, 15}
-  "START" => {24, 2, 24, 16}
+  ""START"" => {24, 2, 24, 16}
   "This is a heredoc
 It spans multiple lines
 " => {25, 2, 25, 18}
@@ -1348,7 +1298,7 @@ It spans multiple lines
     "Alice" => {65, 16, 65, 23}
     "Bob" => {65, 25, 65, 30}
     "Charlie" => {65, 32, 65, 41}
-  "module.kms_key[0].key_id" => {68, 2, 68, 12}
+  "development-key" => {68, 2, 68, 12}
   "region.hcl" => {70, 2, 70, 13}
   {
     "locals": {
@@ -1357,8 +1307,8 @@ It spans multiple lines
   } => {71, 2, 71, 13}
   "test" => {73, 2, 73, 18}
   {
-    "\"Environment\"": "test",
-    "\"Category\"": "Production:Critical-test"
+    "Environment": "test",
+    "Category": "Production:Critical-test"
   } => {74, 2, 74, 15}
     "test" => {75, 4, 75, 17}
     "Production:Critical-test" => {76, 4, 76, 14}
@@ -1370,10 +1320,10 @@ It spans multiple lines
         "hostname": "host1",
         "tags": [
           {
-            "\"type\"": "web"
+            "type": "web"
           },
           {
-            "\"type\"": "prod"
+            "type": "prod"
           }
         ]
       },
@@ -1383,10 +1333,10 @@ It spans multiple lines
         "hostname": "host2",
         "tags": [
           {
-            "\"type\"": "db"
+            "type": "db"
           },
           {
-            "\"type\"": "prod"
+            "type": "prod"
           }
         ]
       },
@@ -1396,10 +1346,10 @@ It spans multiple lines
         "hostname": "host3",
         "tags": [
           {
-            "\"type\"": "web"
+            "type": "web"
           },
           {
-            "\"type\"": "dev"
+            "type": "dev"
           }
         ]
       }
@@ -1412,10 +1362,10 @@ It spans multiple lines
         "hostname": "host1",
         "tags": [
           {
-            "\"type\"": "web"
+            "type": "web"
           },
           {
-            "\"type\"": "prod"
+            "type": "prod"
           }
         ]
       },
@@ -1425,10 +1375,10 @@ It spans multiple lines
         "hostname": "host2",
         "tags": [
           {
-            "\"type\"": "db"
+            "type": "db"
           },
           {
-            "\"type\"": "prod"
+            "type": "prod"
           }
         ]
       },
@@ -1438,10 +1388,10 @@ It spans multiple lines
         "hostname": "host3",
         "tags": [
           {
-            "\"type\"": "web"
+            "type": "web"
           },
           {
-            "\"type\"": "dev"
+            "type": "dev"
           }
         ]
       }
@@ -1451,10 +1401,10 @@ It spans multiple lines
       "host1" => {85, 8, 85, 16}
       [
         {
-          "\"type\"": "web"
+          "type": "web"
         },
         {
-          "\"type\"": "prod"
+          "type": "prod"
         }
       ] => {86, 8, 86, 12}
         "web" => {86, 18, 86, 24}
@@ -1464,10 +1414,10 @@ It spans multiple lines
       "host2" => {91, 8, 91, 16}
       [
         {
-          "\"type\"": "db"
+          "type": "db"
         },
         {
-          "\"type\"": "prod"
+          "type": "prod"
         }
       ] => {92, 8, 92, 12}
         "db" => {92, 18, 92, 24}
@@ -1477,10 +1427,10 @@ It spans multiple lines
       "host3" => {97, 8, 97, 16}
       [
         {
-          "\"type\"": "web"
+          "type": "web"
         },
         {
-          "\"type\"": "dev"
+          "type": "dev"
         }
       ] => {98, 8, 98, 12}
         "web" => {98, 18, 98, 24}
@@ -1573,43 +1523,43 @@ It spans multiple lines
             "test4" => {116, 30, 116, 37}
   [
     {
-      "\"type\"": "web"
+      "type": "web"
     },
     {
-      "\"type\"": "db"
+      "type": "db"
     },
     {
-      "\"type\"": "web"
+      "type": "web"
     }
   ] => {124, 2, 124, 12}
-  "local.complex_structure.foo" => {125, 2, 125, 12}
-  {
-    "value": [
-      "Hello, Bob!"
-    ]
-  } => {128, 0, 128, 6}
+  [
     [
-      "Hello, Bob!"
-    ] => {130, 2, 130, 7}
+      "test1",
+      "test2"
+    ],
+    [
+      "test3",
+      "test4"
+    ]
+  ] => {125, 2, 125, 12}
+  [
+    "Hello, Bob!"
+  ] => {127, 2, 127, 10}
   {
-    "value": {
-      "server1": "t2.micro",
-      "server3": "t2.large"
-    }
-  } => {133, 0, 133, 6}
-    {
-      "server1": "t2.micro",
-      "server3": "t2.large"
-    } => {135, 2, 135, 7}
+    "server1": "t2.micro",
+    "server3": "t2.large"
+  } => {128, 2, 128, 11}
 {
   "region_code": "us-east-1"
-} => {140, 0, 140, 6}
-  "us-east-1" => {141, 2, 141, 13}
+} => {131, 0, 131, 6}
+  "us-east-1" => {132, 2, 132, 13}
   {
-    "config_path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc"
-  } => {149, 0, 149, 10}
-    "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc" => {150, 2, 150, 13}
+    "config_path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc",
+    "skip_outputs": true
+  } => {135, 0, 135, 10}
+    "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc" => {136, 2, 136, 13}
+    true => {137, 2, 137, 14}
 {
   "path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/terragrunt.hcl"
-} => {153, 0, 153, 7}
-  "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/terragrunt.hcl" => {154, 2, 154, 6}
+} => {140, 0, 140, 7}
+  "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/terragrunt.hcl" => {141, 2, 141, 6}

@@ -1,25 +1,10 @@
 Reading input file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/cluster/input.json
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/cluster/terragrunt.hcl
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc.hcl
-Failed to evaluate expression: git::https://github.com/terraform-aws-modules/terraform-aws-eks.git//modules/aws-auth?ref=v20.24.0 Error: Error: Unexpected ":" at character 3
-Failed to evaluate expression: prefix-shop-suffix Error: Error: Undefined identifier: prefix
-Failed to evaluate expression: ":"START" => END"" Error: Error: Unclosed quote after "" at character 18
-Failed to evaluate expression: This is a heredoc
-It spans multiple lines
- Error: Error: Undefined identifier: This
-Failed to evaluate expression: tfInfo.configs.variable.kms_key_id==null.default Error: TypeError: Cannot read properties of null (reading 'default')
-Failed to evaluate expression: module.kms_key[0].key_id Error: TypeError: Cannot read properties of undefined (reading 'kms_key')
-Failed to evaluate expression: module.kms_key[0].key_id Error: TypeError: Cannot read properties of undefined (reading 'kms_key')
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/region.hcl
-Error in argument: TypeError: Cannot read properties of undefined (reading 'map')
-Failed to evaluate expression: string Error: Error: Undefined identifier: string
 {
   "variable": {
-    "kms_key_id": "my-kms-key",
-    "name": {
-      "type": "string",
-      "default": "world"
-    }
+    "kms_key_id": "my-kms-key"
   },
   "terraform": {
     "source": "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git//modules/aws-auth?ref=v20.24.0"
@@ -54,9 +39,9 @@ Failed to evaluate expression: string Error: Error: Undefined identifier: string
     ],
     "regex_pattern": "^(?:[A-Za-z0-9+/]{2})*(?:[A-Za-z0-9+/][NSD]==|[A-Za-z0-9+/]{2}[AFASDASDcgkosw048]=)?$",
     "quoted_template": "prefix-shop-suffix",
-    "quotes_template": "prefix-shop-suffix",
+    "quotes_template": "\"prefix-shop-suffix\"",
     "quotes_string": ":\"START\" => END\"",
-    "quotes_string2": "START",
+    "quotes_string2": "\"START\"",
     "multiline_string": "This is a heredoc\nIt spans multiple lines\n",
     "primary_region": "shop-mst-us",
     "secondary_region": "shop-pst-us",
@@ -102,7 +87,7 @@ Failed to evaluate expression: string Error: Error: Undefined identifier: string
       "Bob",
       "Charlie"
     ],
-    "kms_key_id": "module.kms_key[0].key_id",
+    "kms_key_id": "development-key",
     "region_file": "region.hcl",
     "region_vars": {
       "locals": {
@@ -111,8 +96,8 @@ Failed to evaluate expression: string Error: Error: Undefined identifier: string
     },
     "environment_name": "test",
     "resource_tags": {
-      "\"Environment\"": "test",
-      "\"Category\"": "Production:Critical-test"
+      "Environment": "test",
+      "Category": "Production:Critical-test"
     },
     "network_config": {
       "instances": [
@@ -122,10 +107,10 @@ Failed to evaluate expression: string Error: Error: Undefined identifier: string
           "hostname": "host1",
           "tags": [
             {
-              "\"type\"": "web"
+              "type": "web"
             },
             {
-              "\"type\"": "prod"
+              "type": "prod"
             }
           ]
         },
@@ -135,10 +120,10 @@ Failed to evaluate expression: string Error: Error: Undefined identifier: string
           "hostname": "host2",
           "tags": [
             {
-              "\"type\"": "db"
+              "type": "db"
             },
             {
-              "\"type\"": "prod"
+              "type": "prod"
             }
           ]
         },
@@ -148,10 +133,10 @@ Failed to evaluate expression: string Error: Error: Undefined identifier: string
           "hostname": "host3",
           "tags": [
             {
-              "\"type\"": "web"
+              "type": "web"
             },
             {
-              "\"type\"": "dev"
+              "type": "dev"
             }
           ]
         }
@@ -185,28 +170,31 @@ Failed to evaluate expression: string Error: Error: Undefined identifier: string
     ],
     "full_splat": [
       {
-        "\"type\"": "web"
+        "type": "web"
       },
       {
-        "\"type\"": "db"
+        "type": "db"
       },
       {
-        "\"type\"": "web"
+        "type": "web"
       }
     ],
-    "attr_splat": "local.complex_structure.foo"
-  },
-  "output": {
-    "greetings": {
-      "value": [
-        "Hello, Bob!"
+    "attr_splat": [
+      [
+        "test1",
+        "test2"
+      ],
+      [
+        "test3",
+        "test4"
       ]
-    },
-    "active_server_instances": {
-      "value": {
-        "server1": "t2.micro",
-        "server3": "t2.large"
-      }
+    ],
+    "forTuple": [
+      "Hello, Bob!"
+    ],
+    "forObject": {
+      "server1": "t2.micro",
+      "server3": "t2.large"
     }
   },
   "inputs": {
@@ -214,7 +202,8 @@ Failed to evaluate expression: string Error: Error: Undefined identifier: string
   },
   "dependency": {
     "vpc": {
-      "config_path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc"
+      "config_path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc",
+      "skip_outputs": true
     }
   },
   "include": {

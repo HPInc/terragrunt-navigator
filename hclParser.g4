@@ -102,15 +102,15 @@ fullSplat
     ;
 
 operation
-    : unaryOp
-    | binaryOp
+    : unaryOperation
+    | binaryOperation
     ;
 
-unaryOp
+unaryOperation
     :  unaryOperator (exprTerm|operation)
     ;
 
-binaryOp
+binaryOperation
     : exprTerm binaryOperator (exprTerm|operation)
     ;
 

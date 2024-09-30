@@ -1,6 +1,7 @@
 {
   "tabWidth": 4,
   "useTabs": false,
+  "semi": true,
   "bracketSameLine": true,
   "singleQuote": true,
   "endOfLine": "lf",

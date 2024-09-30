@@ -1,3 +1,7 @@
+v0.8.1
+- Improved handing of type of data
+- Bug fixes
+
 v0.8.0
 - Improvement in function args handling
 - Improvement in identifing the ranges for object inside tuple

@@ -24,10 +24,10 @@
       ],
       "program": "${workspaceFolder}/terragrunt.js",
       "args": [
-        //"tests/env/region/cluster/terragrunt.hcl"
         "-r",
         "-f",
         "/root/op.hcl"
+        //"tests/env/region/cluster/terragrunt.hcl"
       ]
     },
     {

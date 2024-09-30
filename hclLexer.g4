@@ -81,11 +81,21 @@ NUMBER
     ;
 
 QUOTED_TEMPLATE
-    : QUOTE ~[\r\n]*? (DOLLAR_LCURL ~[\r\n]*? RCURL)+ ~[\r\n]*? QUOTE
+    : QUOTE QSTRING_CHARS*? (DOLLAR_LCURL QSTRING_CHARS*? RCURL)+ QSTRING_CHARS*? QUOTE
     ;
 
 STRING_LITERAL
-    : QUOTE (~[\r\n"\\] | '\\' .)* QUOTE
+    : QUOTE (STRING_CHARS)* QUOTE
+    ;
+
+fragment STRING_CHARS
+    : ~[\r\n"\\]
+    | '\\' .
+    ;
+
+fragment QSTRING_CHARS
+    : ~[\r\n\\]
+    | '\\' .
     ;
 
 NEWLINE
