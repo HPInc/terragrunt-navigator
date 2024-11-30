@@ -18,12 +18,23 @@ function find_in_parent_folders(fileName = null) {
         fileName = 'terragrunt.hcl';
     }
     let currentDir = path.dirname(this.path.root);
-    while (currentDir !== '/') {
+    const isWindows = process.platform === 'win32';
+
+    while (true) {
         let filePath = path.join(currentDir, fileName);
         if (fs.existsSync(filePath)) {
             return filePath;
         }
-        currentDir = path.dirname(currentDir);
+
+        let parentDir = path.dirname(currentDir);
+        if (
+            currentDir === parentDir ||
+            (isWindows && currentDir.match(/^[a-zA-Z]:\\$/)) ||
+            (!isWindows && currentDir === '/')
+        ) {
+            break;
+        }
+        currentDir = parentDir;
     }
     return null;
 }
@@ -97,25 +108,31 @@ function fetch_key_info(configs, ranges, depth = 0) {
 
     for (let key in configs) {
         if (ranges?.hasOwnProperty(key)) {
-            let value = configs[key];
-            let range = ranges[key];
-            if (Array.isArray(value) && Array.isArray(range)) {
-                print_key_info(value, range[range.length - 1], depth);
-                for (let i = 0; i < value.length; i++) {
-                    let v = value[i];
-                    let r = range[i];
-                    if (typeof v === 'object' && v !== null) {
-                        fetch_key_info(v, r, depth + 1);
-                    } else {
-                        print_key_info(v, r, depth + 1);
-                    }
-                }
-            } else if (typeof value === 'object' && value !== null) {
-                print_key_info(value, range, depth);
-                fetch_key_info(value, range, depth + 1);
-            } else {
-                print_key_info(value, range, depth);
-            }
+            process_key_info(configs[key], ranges[key], depth);
+        }
+    }
+}
+
+function process_key_info(value, range, depth) {
+    if (Array.isArray(value) && Array.isArray(range)) {
+        process_array_info(value, range, depth);
+    } else if (typeof value === 'object' && value !== null) {
+        print_key_info(value, range, depth);
+        fetch_key_info(value, range, depth + 1);
+    } else {
+        print_key_info(value, range, depth);
+    }
+}
+
+function process_array_info(value, range, depth) {
+    print_key_info(value, range[range.length - 1], depth);
+    for (let i = 0; i < value.length; i++) {
+        let v = value[i];
+        let r = range[i];
+        if (typeof v === 'object' && v !== null) {
+            fetch_key_info(v, r, depth + 1);
+        } else {
+            print_key_info(v, r, depth + 1);
         }
     }
 }
