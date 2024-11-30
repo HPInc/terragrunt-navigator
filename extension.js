@@ -7,7 +7,7 @@ const { execSync } = require('child_process');
 const Parser = require('./parser');
 const Terragrunt = require('./terragrunt');
 
-let linkDecator = vscode.window.createTextEditorDecorationType({
+let linkDecorator = vscode.window.createTextEditorDecorationType({
     textDecoration: 'underline',
     overviewRulerColor: 'blue',
     overviewRulerLane: vscode.OverviewRulerLane.Right,
@@ -83,6 +83,7 @@ class TerragruntNav {
     getCodePath = '';
     tfInfo = {};
     lastModulePath = null;
+    lastHCLFile = null;
 
     constructor(context) {
         const repoCacheDir = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
@@ -94,9 +95,7 @@ class TerragruntNav {
 
         if (featureToggles['ReplaceStrings'] === undefined) {
             featureToggles['ReplaceStrings'] = true;
-            vscode.workspace
-                .getConfiguration('terragrunt-navigator')
-                .update('featureToggles', featureToggles, vscode.ConfigurationTarget.Global);
+            setImmediate(() => this.updateSetting(config, 'featureToggles', featureToggles));
         }
         this.replaceStrings = featureToggles['ReplaceStrings'];
 
@@ -105,14 +104,10 @@ class TerragruntNav {
             this.replacementStrings.push({ find: '', replace: '' });
         }
 
-        this.quickReplaceStringsCount = vscode.workspace
-            .getConfiguration('terragrunt-navigator')
-            .get('quickReplaceStringsCount');
+        this.quickReplaceStringsCount = config.get('quickReplaceStringsCount');
         if (this.quickReplaceStringsCount === undefined || this.quickReplaceStringsCount < 1) {
             this.quickReplaceStringsCount = 1;
-            vscode.workspace
-                .getConfiguration('terragrunt-navigator')
-                .update('quickReplaceStringsCount', this.quickReplaceStringsCount, vscode.ConfigurationTarget.Global);
+            setImmediate(() => this.updateSetting(config, 'quickReplaceStringsCount', this.quickReplaceStringsCount));
         }
 
         const extensionPath = context.extensionPath;
@@ -137,6 +132,10 @@ class TerragruntNav {
                 uri: vscode.Uri.file(this.terragruntRepoCache),
             });
         }
+    }
+
+    async updateSetting(config, key, value) {
+        await config.update(key, value, vscode.ConfigurationTarget.Global);
     }
 
     provideDocumentLinks(document, token) {
@@ -164,7 +163,7 @@ class TerragruntNav {
         }
 
         if (vscode.window.activeTextEditor) {
-            vscode.window.activeTextEditor.setDecorations(linkDecator, linkDecorations);
+            vscode.window.activeTextEditor.setDecorations(linkDecorator, linkDecorations);
             vscode.window.activeTextEditor.setDecorations(lhsDecorator, lhsDecorations);
             vscode.window.activeTextEditor.setDecorations(rhsDecorator, rhsDecorations);
             vscode.window.activeTextEditor.setDocumentLinks(links);
@@ -181,24 +180,30 @@ class TerragruntNav {
             if (!ranges?.hasOwnProperty(key)) {
                 continue;
             }
-            let value = configs[key];
-            let range = ranges[key];
-            if (Array.isArray(value) && Array.isArray(range)) {
-                this.updateDecorations(decorations, value, range[range.length - 1]);
-                for (let i = 0; i < value.length; i++) {
-                    let v = value[i];
-                    let r = range[i];
-                    if (typeof v === 'object' && v !== null) {
-                        this.decorateKeys(decorations, v, r);
-                    } else {
-                        this.updateDecorations(decorations, v, r);
-                    }
-                }
-            } else if (typeof value === 'object' && value !== null) {
-                this.updateDecorations(decorations, value, range);
-                this.decorateKeys(decorations, value, range);
+            this.processKey(decorations, configs[key], ranges[key]);
+        }
+    }
+
+    processKey(decorations, value, range) {
+        if (Array.isArray(value) && Array.isArray(range)) {
+            this.updateDecorations(decorations, value, range[range.length - 1]);
+            this.processArray(decorations, value, range);
+        } else if (typeof value === 'object' && value !== null) {
+            this.updateDecorations(decorations, value, range);
+            this.decorateKeys(decorations, value, range);
+        } else {
+            this.updateDecorations(decorations, value, range);
+        }
+    }
+
+    processArray(decorations, valueArray, rangeArray) {
+        for (let i = 0; i < valueArray.length; i++) {
+            let v = valueArray[i];
+            let r = rangeArray[i];
+            if (typeof v === 'object' && v !== null) {
+                this.decorateKeys(decorations, v, r);
             } else {
-                this.updateDecorations(decorations, value, range);
+                this.updateDecorations(decorations, v, r);
             }
         }
     }
@@ -279,18 +284,38 @@ class TerragruntNav {
         const filePath = vscode.window.activeTextEditor.document.uri.fsPath;
         try {
             const baseDir = path.dirname(filePath);
+            let fileName = path.basename(filePath);
             if (this.lastModulePath === baseDir) {
-                console.log('Already read terragrunt config for ' + baseDir);
-                return;
+                let allowedNames = [fileName, null];
+                let revalidate = true;
+                if (fileName.endsWith('.hcl')) {
+                    if (allowedNames.includes(this.lastHCLFile)) {
+                        this.lastHCLFile = fileName;
+                        revalidate = false;
+                    }
+                } else {
+                    revalidate = false;
+                }
+
+                if (!revalidate) {
+                    console.log('Already read terragrunt config for ' + baseDir);
+                    return;
+                }
             }
             this.lastModulePath = baseDir;
+            if (fileName.endsWith('.hcl')) {
+                this.lastHCLFile = fileName;
+            } else {
+                this.lastHCLFile = null;
+            }
+
             this.tfInfo = {
                 freshStart: true,
                 printTree: false,
                 traverse: Parser.traverse,
             };
             console.log('Reading config for ' + filePath);
-            if (path.basename(filePath) === 'main.tf') {
+            if (fileName === 'main.tf') {
                 let varFile = filePath.replace('main.tf', 'variables.tf');
                 if (fs.existsSync(varFile)) {
                     console.log('Reading variables for main.tf ' + varFile);
