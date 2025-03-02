@@ -11,6 +11,10 @@
   "contributes": {
     "commands": [
       {
+        "command": "terragrunt-navigator.quickReplaceStringsCountCommand",
+        "title": "Terragrunt Navigator: Quick Replace Strings Count"
+      },
+      {
         "command": "terragrunt-navigator.replacementStringsCommand",
         "title": "Terragrunt Navigator: Replacement Strings"
       },
@@ -25,6 +29,11 @@
           "default": {},
           "description": "Controls the feature toggles for the Terragrunt Navigator extension.",
           "properties": {
+            "AddTerragruntCacheToWorkspace": {
+              "default": true,
+              "description": "Enable/disable adding Terragrunt cache to workspace.",
+              "type": "boolean"
+            },
             "ReplaceStrings": {
               "default": true,
               "description": "Enable/disable string replacements feature.",
@@ -32,6 +41,11 @@
             }
           },
           "type": "object"
+        },
+        "terragrunt-navigator.quickReplaceStringsCount": {
+          "default": 1,
+          "description": "Number of quick replace strings.",
+          "type": "number"
         },
         "terragrunt-navigator.replacementStrings": {
           "default": [],
@@ -79,7 +93,7 @@
     "mkdirp": "^1.0.4",
     "mocha": "^10.7.3",
     "rimraf": "^4.0.0",
-    "webpack": "^5.64.4",
+    "webpack": "^5.97.1",
     "webpack-cli": "^4.10.0"
   },
   "displayName": "Terragrunt/Terraform Navigator",
@@ -101,5 +115,5 @@
     "compile": "java -jar /usr/local/lib/antlr-4.13.2-complete.jar -Dlanguage=JavaScript hclLexer.g4 hclParser.g4 -o generated -Xexact-output-dir -visitor && npx babel generated --out-dir generated-cjs",
     "test": "node ./parser.js tests/env/region/cluster/terragrunt.hcl"
   },
-  "version": "0.8.2"
+  "version": "0.8.3"
 }
