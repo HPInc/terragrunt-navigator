@@ -93,6 +93,11 @@ class TerragruntNav {
         this.lastClonedMap = new Map();
         let config = vscode.workspace.getConfiguration('terragrunt-navigator');
 
+        const lastClonedMapConfig = config.get('lastClonedMap');
+        if (lastClonedMapConfig) {
+            this.lastClonedMap = new Map(Object.entries(lastClonedMapConfig));
+        }
+
         let featureToggles = getFeatureTogglesConfig();
         let setDefaults = false;
         this.replaceStrings = featureToggles['ReplaceStrings'];
@@ -497,6 +502,8 @@ class TerragruntNav {
                 clone = false;
             } else {
                 this.lastClonedMap.set(repoDir, now);
+                let config = vscode.workspace.getConfiguration('terragrunt-navigator', null);
+                this.updateSetting(config, 'lastClonedMap', Object.fromEntries(this.lastClonedMap));
             }
         }
 

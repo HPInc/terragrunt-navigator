@@ -3,6 +3,7 @@ v0.8.3
 - Added feature toggle for avoiding adding cache to workspace(Need to set it before firsttime clicking in repo link)
 - Bug fixes
 - Updated npm packages
+- Increased timeout before a fresh clone to 50 minutes
 
 v0.8.2
 - Bug fixes
