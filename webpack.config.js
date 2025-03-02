@@ -15,6 +15,9 @@ module.exports = {
     resolve: {
         extensions: ['.js'],
         preferRelative: true,
-        modules: [path.resolve(__dirname, 'generated-cjs'), 'node_modules'],
+        fallback: {
+            fs: false,
+        },
+        modules: ['generated-cjs', 'node_modules'],
     },
 };

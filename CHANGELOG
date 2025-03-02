@@ -1,3 +1,9 @@
+v0.8.3
+- Fix error where the extension not working in Windows
+- Added feature toggle for avoiding adding cache to workspace(Need to set it before firsttime clicking in repo link)
+- Bug fixes
+- Updated npm packages
+
 v0.8.2
 - Bug fixes
 

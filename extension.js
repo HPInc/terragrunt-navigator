@@ -84,20 +84,30 @@ class TerragruntNav {
     tfInfo = {};
     lastModulePath = null;
     lastHCLFile = null;
+    terragruntRepoCacheWSFolderExists = false;
+    addTerragruntCacheToWorkspace = true;
 
     constructor(context) {
         const repoCacheDir = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
         this.terragruntRepoCache = path.join(repoCacheDir, '.terragrunt-repo-cache');
         this.lastClonedMap = new Map();
-
         let config = vscode.workspace.getConfiguration('terragrunt-navigator');
-        let featureToggles = getFeatureTogglesConfig();
 
-        if (featureToggles['ReplaceStrings'] === undefined) {
-            featureToggles['ReplaceStrings'] = true;
-            setImmediate(() => this.updateSetting(config, 'featureToggles', featureToggles));
-        }
+        let featureToggles = getFeatureTogglesConfig();
+        let setDefaults = false;
         this.replaceStrings = featureToggles['ReplaceStrings'];
+        if (this.replaceStrings === undefined) {
+            this.replaceStrings = true;
+            setDefaults = true;
+        }
+        this.addTerragruntCacheToWorkspace = featureToggles['AddTerragruntCacheToWorkspace'];
+        if (this.addTerragruntCacheToWorkspace === undefined) {
+            this.addTerragruntCacheToWorkspace = true;
+            setDefaults = true;
+        }
+        if (setDefaults) {
+            this.updateSetting(config, 'featureToggles', featureToggles);
+        }
 
         this.replacementStrings = config.get('replacementStrings');
         if (this.replacementStrings === undefined || this.replacementStrings.length === 0) {
@@ -107,35 +117,30 @@ class TerragruntNav {
         this.quickReplaceStringsCount = config.get('quickReplaceStringsCount');
         if (this.quickReplaceStringsCount === undefined || this.quickReplaceStringsCount < 1) {
             this.quickReplaceStringsCount = 1;
-            setImmediate(() => this.updateSetting(config, 'quickReplaceStringsCount', this.quickReplaceStringsCount));
+            this.updateSetting(config, 'quickReplaceStringsCount', this.quickReplaceStringsCount);
         }
 
         const extensionPath = context.extensionPath;
         this.getCodePath = path.join(extensionPath, 'get-code.sh');
 
-        let terragruntRepoCacheExists = false;
         for (let folder of vscode.workspace.workspaceFolders) {
-            if (folder.uri.fsPath.endsWith('terragrunt-repo-cache')) {
+            if (folder.uri.fsPath.endsWith('.terragrunt-repo-cache')) {
                 this.terragruntRepoCache = folder.uri.fsPath;
-                terragruntRepoCacheExists = true;
+                this.terragruntRepoCacheWSFolderExists = true;
                 break;
             }
         }
 
-        if (!terragruntRepoCacheExists) {
+        if (!this.terragruntRepoCacheWSFolderExists) {
             if (!fs.existsSync(this.terragruntRepoCache)) {
                 fs.mkdirSync(this.terragruntRepoCache);
                 console.log('Created terragrunt repo cache directory');
             }
-
-            vscode.workspace.updateWorkspaceFolders(0, 0, {
-                uri: vscode.Uri.file(this.terragruntRepoCache),
-            });
         }
     }
 
-    async updateSetting(config, key, value) {
-        await config.update(key, value, vscode.ConfigurationTarget.Global);
+    updateSetting(config, key, value) {
+        config.update(key, value, vscode.ConfigurationTarget.Global);
     }
 
     provideDocumentLinks(document, token) {
@@ -383,6 +388,11 @@ class TerragruntNav {
 
         let uri = null;
         if (location === 'git') {
+            if (this.addTerragruntCacheToWorkspace && !this.terragruntRepoCacheWSFolderExists) {
+                vscode.workspace.updateWorkspaceFolders(0, 0, {
+                    uri: vscode.Uri.file(this.terragruntRepoCache),
+                });
+            }
             let { repoUrl, ref, urlPath, modulePath, repoDir } = this.getRepoDetails(match);
             uri = this.cloneRepo(repoUrl, ref, urlPath, modulePath, repoDir);
         } else {
@@ -447,10 +457,29 @@ class TerragruntNav {
         console.log('Checking workspace folders for ' + repoName);
         if (vscode.workspace.workspaceFolders) {
             for (let folder of vscode.workspace.workspaceFolders) {
-                console.log(folder.uri.fsPath);
                 if (folder.uri.fsPath.endsWith(repoName)) {
                     repoDir = folder.uri.fsPath;
                     break;
+                }
+            }
+            if (repoDir == null) {
+                console.log(`Didn't find ${repoName} in workspace folders. Checking one level deep`);
+                for (let folder of vscode.workspace.workspaceFolders) {
+                    console.log(`Checking in folder ${folder.uri.fsPath}`);
+                    const subdirs = fs
+                        .readdirSync(folder.uri.fsPath, { withFileTypes: true })
+                        .filter((dirent) => dirent.isDirectory())
+                        .map((dirent) => path.join(folder.uri.fsPath, dirent.name));
+                    for (let subdir of subdirs) {
+                        if (subdir.endsWith(repoName)) {
+                            repoDir = subdir;
+                            break;
+                        }
+                    }
+                    if (repoDir) {
+                        console.log(`Found ${repoName} in ${repoDir}`);
+                        break;
+                    }
                 }
             }
         }
@@ -464,7 +493,7 @@ class TerragruntNav {
         } else {
             repoDir = path.join(this.terragruntRepoCache, urlPath);
             const now = Date.now();
-            if (this.lastClonedMap.has(repoDir) && now - this.lastClonedMap.get(repoDir) < 30000) {
+            if (this.lastClonedMap.has(repoDir) && now - this.lastClonedMap.get(repoDir) < 3000000) {
                 clone = false;
             } else {
                 this.lastClonedMap.set(repoDir, now);
@@ -494,6 +523,19 @@ class TerragruntNav {
         }
         let dir = path.join(repoDir, modulePath);
         return vscode.Uri.file(dir);
+    }
+}
+
+async function quickReplaceStringsCountCommand(terragruntNav) {
+    let quickReplaceStringsCount = terragruntNav.quickReplaceStringsCount;
+    let count = await vscode.window.showInputBox({
+        prompt: 'Enter the number of strings to show for quick replacement',
+        value: quickReplaceStringsCount.toString(),
+    });
+
+    if (count !== undefined) {
+        let config = vscode.workspace.getConfiguration('terragrunt-navigator', null);
+        await config.update('quickReplaceStringsCount', parseInt(count), vscode.ConfigurationTarget.Global);
     }
 }
 
@@ -529,9 +571,15 @@ async function replacementStringsCommand(terragruntNav) {
 
 function getFeatureTogglesConfig() {
     let config = vscode.workspace.getConfiguration('terragrunt-navigator');
-    let featureToggles = config.get('featureToggles') || {
+    let toggles = config.get('featureToggles') || {
         ReplaceStrings: undefined,
+        AddTerragruntCacheToWorkspace: undefined,
     };
+
+    let featureToggles = {};
+    featureToggles['ReplaceStrings'] = toggles['ReplaceStrings'];
+    featureToggles['AddTerragruntCacheToWorkspace'] = toggles['AddTerragruntCacheToWorkspace'];
+
     return featureToggles;
 }
 
@@ -572,6 +620,7 @@ function activate(context) {
     }
 
     let commandFunctionMap = {
+        quickReplaceStringsCountCommand: quickReplaceStringsCountCommand,
         replacementStringsCommand: replacementStringsCommand,
         featureTogglesCommand: featureTogglesCommand,
     };
@@ -585,7 +634,12 @@ function activate(context) {
     }
 
     vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('terragrunt-navigator.replaceStrings')) {
+        if (event.affectsConfiguration('terragrunt-navigator.quickReplaceStringsCount')) {
+            terragruntNav.quickReplaceStringsCount = vscode.workspace
+                .getConfiguration('terragrunt-navigator')
+                .get('quickReplaceStringsCount');
+        }
+        if (event.affectsConfiguration('terragrunt-navigator.replacementStrings')) {
             if (vscode.window.activeTextEditor) {
                 terragruntNav.provideDocumentLinks(vscode.window.activeTextEditor.document, null);
             }
@@ -594,6 +648,7 @@ function activate(context) {
         if (event.affectsConfiguration('terragrunt-navigator.featureToggles')) {
             let featureToggles = getFeatureTogglesConfig();
             terragruntNav.replaceStrings = featureToggles['ReplaceStrings'];
+            terragruntNav.addTerragruntCacheToWorkspace = featureToggles['AddTerragruntCacheToWorkspace'];
         }
     });
 
