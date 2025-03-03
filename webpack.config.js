@@ -13,11 +13,20 @@ module.exports = {
         vscode: 'commonjs vscode',
     },
     resolve: {
-        extensions: ['.js'],
+        extensions: ['.js', '.mjs'],
         preferRelative: true,
         fallback: {
             fs: false,
         },
         modules: ['generated-cjs', 'node_modules'],
+    },
+    module: {
+        rules: [
+            {
+                test: /\.mjs$/,
+                include: /node_modules/,
+                type: 'javascript/auto',
+            },
+        ],
     },
 };

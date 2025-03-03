@@ -65,7 +65,6 @@ if [ $DEVELOPMENT -eq 1 ]; then
 else
   npm run build:prod
   npx webpack --mode production
-  sed -i "s#file:///.*dist/#file://#g" extension.js
 fi
 
 rm -f ./*.vsix
