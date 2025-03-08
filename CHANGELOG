@@ -1,3 +1,6 @@
+v0.8.5
+- Improved support for terraform modules(not complete)
+
 v0.8.4
 - Fix extension failing to load in Linux
 

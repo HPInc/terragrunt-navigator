@@ -83,9 +83,9 @@ class TerragruntNav {
     getCodePath = '';
     tfInfo = {};
     lastModulePath = null;
-    lastHCLFile = null;
     terragruntRepoCacheWSFolderExists = false;
     addTerragruntCacheToWorkspace = true;
+    tfCache = {};
 
     constructor(context) {
         const repoCacheDir = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
@@ -186,8 +186,8 @@ class TerragruntNav {
             return;
         }
 
-        for (let key in configs) {
-            if (!ranges?.hasOwnProperty(key)) {
+        for (let key in ranges) {
+            if (!configs?.hasOwnProperty(key)) {
                 continue;
             }
             this.processKey(decorations, configs[key], ranges[key]);
@@ -295,49 +295,49 @@ class TerragruntNav {
         try {
             const baseDir = path.dirname(filePath);
             let fileName = path.basename(filePath);
-            if (this.lastModulePath === baseDir) {
-                let allowedNames = [fileName, null];
-                let revalidate = true;
-                if (fileName.endsWith('.hcl')) {
-                    if (allowedNames.includes(this.lastHCLFile)) {
-                        this.lastHCLFile = fileName;
-                        revalidate = false;
-                    }
-                } else {
-                    revalidate = false;
-                }
-
-                if (!revalidate) {
-                    console.log('Already read terragrunt config for ' + baseDir);
-                    return;
-                }
-            }
-            this.lastModulePath = baseDir;
-            if (fileName.endsWith('.hcl')) {
-                this.lastHCLFile = fileName;
-            } else {
-                this.lastHCLFile = null;
-            }
 
             this.tfInfo = {
                 freshStart: true,
                 printTree: false,
                 traverse: Parser.traverse,
             };
-            console.log('Reading config for ' + filePath);
-            if (fileName === 'main.tf') {
-                let varFile = filePath.replace('main.tf', 'variables.tf');
-                if (fs.existsSync(varFile)) {
-                    console.log('Reading variables for main.tf ' + varFile);
-                    this.tfInfo.freshStart = true;
-                    Terragrunt.read_terragrunt_config.apply(this.tfInfo, [varFile, this.tfInfo]);
-                }
+
+            console.log('Parsing module in ' + baseDir + 'for file ' + fileName);
+
+            const files = this.getTfFiles(baseDir);
+            for (const file of files) {
+                const fullPath = path.join(baseDir, file);
+                this.tfInfo.freshStart = true;
+                Terragrunt.read_terragrunt_config.apply(this.tfInfo, [fullPath, this.tfInfo]);
             }
-            this.tfInfo.freshStart = true;
-            Terragrunt.read_terragrunt_config.apply(this.tfInfo, [filePath, this.tfInfo]);
+
+            let tfInfo = {
+                freshStart: true,
+                printTree: false,
+                traverse: Parser.traverse,
+                configs: this.tfInfo.configs,
+            };
+            Terragrunt.read_terragrunt_config.apply(tfInfo, [filePath, tfInfo]);
+            this.tfInfo = tfInfo;
+
+            this.tfCache[baseDir] = this.tfInfo;
+            this.lastModulePath = baseDir;
         } catch (e) {
             console.log('Failed to read terragrunt config for ' + filePath + ': ' + e);
         }
+    }
+
+    getTfFiles(baseDir, fileName) {
+        let files = fs.readdirSync(baseDir).filter((file) => file.endsWith('.tf') && file !== fileName);
+        // Workaround: Sort the files with variable.tf and main.tf first, then the rest alphabetically
+        files = files.sort((a, b) => {
+            if (a === 'variable.tf') return -1;
+            if (b === 'variable.tf') return 1;
+            if (a === 'main.tf') return -1;
+            if (b === 'main.tf') return 1;
+            return a.localeCompare(b);
+        });
+        return files;
     }
 
     getPathInfo(match, line, location) {
@@ -666,6 +666,7 @@ function activate(context) {
             const dirPath = path.dirname(editor.document.uri.fsPath);
             if (terragruntNav.lastModulePath === dirPath) {
                 terragruntNav.lastModulePath = null;
+                terragruntNav.tfCache = {};
             }
         }
     });
