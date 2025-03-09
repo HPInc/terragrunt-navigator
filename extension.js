@@ -86,6 +86,8 @@ class TerragruntNav {
     terragruntRepoCacheWSFolderExists = false;
     addTerragruntCacheToWorkspace = true;
     tfCache = {};
+    cacheAccessTimes = new Map();
+    maxCacheSize = 10;
 
     constructor(context) {
         const repoCacheDir = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
@@ -117,6 +119,12 @@ class TerragruntNav {
         this.replacementStrings = config.get('replacementStrings');
         if (this.replacementStrings === undefined || this.replacementStrings.length === 0) {
             this.replacementStrings.push({ find: '', replace: '' });
+        }
+
+        this.maxCacheSize = config.get('maxCacheSize');
+        if (this.maxCacheSize === undefined) {
+            this.maxCacheSize = 10;
+            this.updateSetting(config, 'maxCacheSize', this.maxCacheSize);
         }
 
         this.quickReplaceStringsCount = config.get('quickReplaceStringsCount');
@@ -296,48 +304,53 @@ class TerragruntNav {
             const baseDir = path.dirname(filePath);
             let fileName = path.basename(filePath);
 
-            this.tfInfo = {
-                freshStart: true,
-                printTree: false,
-                traverse: Parser.traverse,
-            };
+            if (baseDir != this.lastModulePath) {
+                this.tfInfo = {
+                    freshStart: true,
+                    printTree: false,
+                    traverse: Parser.traverse,
+                };
 
-            console.log('Parsing module in ' + baseDir + 'for file ' + fileName);
+                console.log('Parsing module in ' + baseDir + 'for file ' + fileName);
 
-            const files = this.getTfFiles(baseDir);
-            for (const file of files) {
-                const fullPath = path.join(baseDir, file);
-                this.tfInfo.freshStart = true;
-                Terragrunt.read_terragrunt_config.apply(this.tfInfo, [fullPath, this.tfInfo]);
+                const files = fs.readdirSync(baseDir).filter((file) => file.endsWith('.tf'));
+                for (const file of files) {
+                    const fullPath = path.join(baseDir, file);
+                    this.tfInfo.freshStart = true;
+                    Terragrunt.read_terragrunt_config.apply(this.tfInfo, [fullPath, this.tfInfo]);
+                }
+                this.tfCache[baseDir] = JSON.parse(JSON.stringify(this.tfInfo));
+                this.lastModulePath = baseDir;
+
+                this.cacheAccessTimes.set(baseDir, Date.now());
+                this.limitCacheSize();
             }
 
-            let tfInfo = {
-                freshStart: true,
-                printTree: false,
-                traverse: Parser.traverse,
-                configs: this.tfInfo.configs,
-            };
-            Terragrunt.read_terragrunt_config.apply(tfInfo, [filePath, tfInfo]);
-            this.tfInfo = tfInfo;
-
-            this.tfCache[baseDir] = this.tfInfo;
-            this.lastModulePath = baseDir;
+            this.tfInfo.configs = {};
+            this.tfInfo.ranges = {};
+            this.tfInfo.freshStart = true;
+            this.tfInfo.tfCache = this.tfCache[baseDir];
+            Terragrunt.read_terragrunt_config.apply(this.tfInfo, [filePath, this.tfInfo]);
         } catch (e) {
             console.log('Failed to read terragrunt config for ' + filePath + ': ' + e);
         }
     }
 
-    getTfFiles(baseDir, fileName) {
-        let files = fs.readdirSync(baseDir).filter((file) => file.endsWith('.tf') && file !== fileName);
-        // Workaround: Sort the files with variable.tf and main.tf first, then the rest alphabetically
-        files = files.sort((a, b) => {
-            if (a === 'variable.tf') return -1;
-            if (b === 'variable.tf') return 1;
-            if (a === 'main.tf') return -1;
-            if (b === 'main.tf') return 1;
-            return a.localeCompare(b);
-        });
-        return files;
+    limitCacheSize() {
+        if (this.cacheAccessTimes.size > this.maxCacheSize) {
+            // Sort cache directories by access time
+            const sortedCacheDirs = Array.from(this.cacheAccessTimes.entries()).sort((a, b) => a[1] - b[1]);
+            // Remove the oldest entries
+            while (this.cacheAccessTimes.size > this.maxCacheSize) {
+                const oldestEntry = sortedCacheDirs.shift();
+                if (oldestEntry) {
+                    const [oldestDir] = oldestEntry;
+                    delete this.tfCache[oldestDir];
+                    this.cacheAccessTimes.delete(oldestDir);
+                    console.log(`Removed oldest cache directory: ${oldestDir}`);
+                }
+            }
+        }
     }
 
     getPathInfo(match, line, location) {
@@ -546,6 +559,19 @@ async function quickReplaceStringsCountCommand(terragruntNav) {
     }
 }
 
+async function maxCacheSizeCommand(terragruntNav) {
+    let maxCacheSize = terragruntNav.maxCacheSize;
+    let count = await vscode.window.showInputBox({
+        prompt: 'Enter the maximum number of cache directories to keep',
+        value: maxCacheSize.toString(),
+    });
+
+    if (count !== undefined) {
+        let config = vscode.workspace.getConfiguration('terragrunt-navigator', null);
+        await config.update('maxCacheSize', parseInt(count), vscode.ConfigurationTarget.Global);
+    }
+}
+
 async function replacementStringsCommand(terragruntNav) {
     let updated = false;
     let replacementStrings = terragruntNav.replacementStrings;
@@ -628,6 +654,7 @@ function activate(context) {
 
     let commandFunctionMap = {
         quickReplaceStringsCountCommand: quickReplaceStringsCountCommand,
+        maxCacheSizeCommand: maxCacheSizeCommand,
         replacementStringsCommand: replacementStringsCommand,
         featureTogglesCommand: featureTogglesCommand,
     };
@@ -645,6 +672,9 @@ function activate(context) {
             terragruntNav.quickReplaceStringsCount = vscode.workspace
                 .getConfiguration('terragrunt-navigator')
                 .get('quickReplaceStringsCount');
+        }
+        if (event.affectsConfiguration('terragrunt-navigator.maxCacheSize')) {
+            terragruntNav.maxCacheSize = vscode.workspace.getConfiguration('terragrunt-navigator').get('maxCacheSize');
         }
         if (event.affectsConfiguration('terragrunt-navigator.replacementStrings')) {
             if (vscode.window.activeTextEditor) {
@@ -665,8 +695,8 @@ function activate(context) {
         if (terragruntNav.lastModulePath && editor?.document) {
             const dirPath = path.dirname(editor.document.uri.fsPath);
             if (terragruntNav.lastModulePath === dirPath) {
+                terragruntNav.tfCache[dirPath] = {};
                 terragruntNav.lastModulePath = null;
-                terragruntNav.tfCache = {};
             }
         }
     });

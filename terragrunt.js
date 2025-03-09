@@ -181,6 +181,7 @@ if (require.main === module) {
         freshStart: true,
         printTree: argv.printTree || false,
         traverse: Parser.traverse,
+        tfCache: null,
         configs: {
             variable: {},
         },
@@ -209,13 +210,16 @@ if (require.main === module) {
             let files = fs.readdirSync(baseDir);
             files.forEach((file) => {
                 let tfFile = path.join(baseDir, file);
-                if (file.endsWith('.tf') && tfFile !== filePath) {
+                if (file.endsWith('.tf')) {
                     tfInfo.freshStart = true;
                     read_terragrunt_config.apply(tfInfo, [tfFile, tfInfo]);
                 }
             });
         }
 
+        tfInfo.tfCache = JSON.parse(JSON.stringify(tfInfo));
+        tfInfo.configs = {};
+        tfInfo.ranges = {};
         tfInfo.freshStart = true;
         read_terragrunt_config.apply(tfInfo, [filePath, tfInfo]);
 
