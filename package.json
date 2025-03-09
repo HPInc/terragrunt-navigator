@@ -15,6 +15,10 @@
         "title": "Terragrunt Navigator: Quick Replace Strings Count"
       },
       {
+        "command": "terragrunt-navigator.maxCacheSizeCommand",
+        "title": "Terragrunt Navigator: Max Cache Size"
+      },
+      {
         "command": "terragrunt-navigator.replacementStringsCommand",
         "title": "Terragrunt Navigator: Replacement Strings"
       },
@@ -41,6 +45,11 @@
             }
           },
           "type": "object"
+        },
+        "terragrunt-navigator.maxCacheSize": {
+          "default": 10,
+          "description": "Maximum cache size.",
+          "type": "number"
         },
         "terragrunt-navigator.quickReplaceStringsCount": {
           "default": 1,
@@ -115,5 +124,5 @@
     "compile": "java -jar /usr/local/lib/antlr-4.13.2-complete.jar -Dlanguage=JavaScript hclLexer.g4 hclParser.g4 -o generated -Xexact-output-dir -visitor && npx babel generated --out-dir generated-cjs",
     "test": "node ./parser.js tests/env/region/cluster/terragrunt.hcl"
   },
-  "version": "0.8.5"
+  "version": "0.9.0"
 }

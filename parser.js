@@ -400,7 +400,7 @@ function handleStringLiteral(tfInfo, parser, node, configs, ranges, identInfo) {
 }
 
 function evalExpression(exp, tfInfo, processOutput = false) {
-    if (typeof exp !== 'string') {
+    if (typeof exp !== 'string' || tfInfo.tfCache === null) {
         return exp;
     }
 
@@ -428,10 +428,10 @@ function runEval(exp, tfInfo, processOutput = false) {
         let context = {
             path: tfInfo.path,
             terraform: tfInfo.terraform,
-            configs: tfInfo.configs,
-            module: tfInfo.configs.module,
-            data: tfInfo.configs.data,
-            local: tfInfo.configs.locals,
+            configs: tfInfo.tfCache.configs,
+            module: tfInfo.tfCache.configs.module,
+            data: tfInfo.tfCache.configs.data,
+            local: tfInfo.tfCache.configs.locals,
             tfInfo: tfInfo,
             traverse: traverse,
         };
@@ -443,10 +443,16 @@ function runEval(exp, tfInfo, processOutput = false) {
 
         if (typeof exp === 'string') {
             if (exp.includes('var.')) {
-                exp = exp.replace(/(var\.)([^. |\]}\r\n,]+)([^ |\]}\r\n,]*)/g, 'tfInfo.configs.variable.$2.default$3');
+                exp = exp.replace(
+                    /(var\.)([^. |\]}\r\n,)]+)([^ |\]}\r\n,)]*)/g,
+                    'tfInfo.tfCache.configs.variable.$2.default$3',
+                );
             }
             if (exp.includes('dependency.')) {
-                exp = exp.replace(/dependency\.([^.]+)\.outputs\./g, 'tfInfo.configs.dependency.$1.mock_outputs.');
+                exp = exp.replace(
+                    /dependency\.([^.]+)\.outputs\./g,
+                    'tfInfo.tfCache.configs.dependency.$1.mock_outputs.',
+                );
             }
             exp = exp.replace(/try\(/g, 'tryTerraform(');
         }
