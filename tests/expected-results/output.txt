@@ -3,9 +3,6 @@ Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/cluster/terragrunt.h
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc.hcl
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/region.hcl
 {
-  "variable": {
-    "kms_key_id": "my-kms-key"
-  },
   "terraform": {
     "source": "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git//modules/aws-auth?ref=v20.24.0"
   },

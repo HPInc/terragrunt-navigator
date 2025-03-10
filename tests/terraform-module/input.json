@@ -1,0 +1,7 @@
+{
+  "inputs": {
+    "app_name": "navigator",
+    "environment": "prod",
+    "region_code": "ue1"
+  }
+}

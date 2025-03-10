@@ -24,10 +24,9 @@
       ],
       "program": "${workspaceFolder}/terragrunt.js",
       "args": [
-        "-r",
+        "-a",
         "-f",
-        "/root/op.hcl"
-        //"tests/env/region/cluster/terragrunt.hcl"
+        "tests/terraform-module/outputs.tf"
       ]
     },
     {

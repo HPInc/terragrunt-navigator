@@ -202,7 +202,7 @@ function handleAttrSplat(tfInfo, parser, node, configs, ranges, identInfo) {
     let key = node.getText();
     let val = configs[ident];
 
-    let splatList = evalExpression(val, tfInfo);
+    let splatList = evalExpression(val, tfInfo, false);
     if (key.includes('.*')) {
         let attrs = key
             .split(/\.?\*\./)
@@ -229,7 +229,7 @@ function handleFullSplat(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let val = configs[ident];
     tfInfo.contextBuffer = {};
-    let splatList = evalExpression(val, tfInfo);
+    let splatList = evalExpression(val, tfInfo, false);
     let result = splatList;
     if (node.children.length > 3) {
         let suffix = node.children[3].getText();
@@ -248,7 +248,7 @@ function handleForTupleExpr(tfInfo, parser, node, configs, ranges, identInfo) {
         let forRule = node.children[1].children.map((node) => node.getText());
         let key = forRule[1];
         tfInfo.contextBuffer = {};
-        let list = evalExpression(forRule[3], tfInfo);
+        let list = evalExpression(forRule[3], tfInfo, false);
         let obj = {};
         let objRanges = {};
         let nodeInfo = {
@@ -267,7 +267,7 @@ function handleForTupleExpr(tfInfo, parser, node, configs, ranges, identInfo) {
         let result = [];
         list.forEach((item) => {
             tfInfo.contextBuffer[key] = item;
-            let condition = conditionExp != null ? evalExpression(conditionExp, tfInfo) : true;
+            let condition = conditionExp != null ? evalExpression(conditionExp, tfInfo, false) : true;
             if (condition) {
                 if (typeof valueExp === 'object') {
                     let value = {};
@@ -294,7 +294,7 @@ function handleForObjectExpr(tfInfo, parser, node, configs, ranges, identInfo) {
         let forRule = node.children[1].children.map((node) => node.getText());
         let key = forRule[1];
         tfInfo.contextBuffer = {};
-        let list = evalExpression(forRule[3], tfInfo);
+        let list = evalExpression(forRule[3], tfInfo, false);
         let keyExp = node.children[2].getText();
         let obj = {};
         let objRanges = {};
@@ -314,7 +314,7 @@ function handleForObjectExpr(tfInfo, parser, node, configs, ranges, identInfo) {
         let result = {};
         list.forEach((item) => {
             tfInfo.contextBuffer[key] = item;
-            let condition = conditionExp != null ? evalExpression(conditionExp, tfInfo) : true;
+            let condition = conditionExp != null ? evalExpression(conditionExp, tfInfo, false) : true;
             if (condition) {
                 if (typeof valueExp === 'object') {
                     let value = {};
@@ -385,7 +385,7 @@ function handleQuotedTemplate(tfInfo, parser, node, configs, ranges, identInfo) 
     tfInfo.contextBuffer = {};
     value = processString(value);
     if (identInfo.evalNeeded == undefined || identInfo.evalNeeded) {
-        value = evalExpression(value, tfInfo);
+        value = evalExpression(value, tfInfo, false);
     }
     updateValue(tfInfo, configs, ident, value);
     ranges[ident] = identInfo.range;
@@ -399,7 +399,7 @@ function handleStringLiteral(tfInfo, parser, node, configs, ranges, identInfo) {
     ranges[ident] = identInfo.range;
 }
 
-function evalExpression(exp, tfInfo, processOutput = false) {
+function evalExpression(exp, tfInfo, processOutput, allowMultipleValues = false) {
     if (typeof exp !== 'string' || tfInfo.doEval === false) {
         return exp;
     }
@@ -410,43 +410,36 @@ function evalExpression(exp, tfInfo, processOutput = false) {
         for (const element of matches) {
             let match = element;
             let key = match.substring(2, match.length - 1);
-            let val = runEval(key, tfInfo, processOutput);
+            let val = runEval(key, tfInfo, processOutput, allowMultipleValues);
             if (typeof val === 'string' || typeof val === 'number') {
                 val = processString(String(val));
                 value = value.replace(match, val);
             }
         }
     } else {
-        value = runEval(value, tfInfo, processOutput);
+        value = runEval(value, tfInfo, processOutput, allowMultipleValues);
     }
     return value;
 }
 
-function runEval(exp, tfInfo, processOutput = false) {
+function runEval(exp, tfInfo, processOutput, allowMultipleValues) {
     let value = exp;
     try {
-        let context = {
-            path: tfInfo.path,
-            terraform: tfInfo.terraform,
-            configs: tfInfo.useCache ? tfInfo.tfCache.configs : tfInfo.configs,
-            module: tfInfo.useCache ? tfInfo.tfCache.configs.module : tfInfo.configs.module,
-            data: tfInfo.useCache ? tfInfo.tfCache.configs.data : tfInfo.configs.data,
-            local: tfInfo.useCache ? tfInfo.tfCache.configs.locals : tfInfo.configs.locals,
-            var: tfInfo.useCache ? tfInfo.tfCache.configs.variable : tfInfo.configs.variable,
-            dependency: tfInfo.useCache ? tfInfo.tfCache.configs.dependency : tfInfo.configs.dependency,
-            outputs: tfInfo.useCache ? tfInfo.tfCache.configs.output : tfInfo.configs.output,
-            tfInfo: tfInfo,
-            traverse: traverse,
-        };
-        context = Object.assign(context, Terragrunt);
-        context = Object.assign(context, Terraform);
-        if (tfInfo.contextBuffer) {
-            context = Object.assign(context, tfInfo.contextBuffer);
-        }
+        const context = getContext(tfInfo);
 
         if (typeof exp === 'string') {
             if (exp.includes('var.')) {
-                exp = exp.replace(/(var\.)([^. |\]}\r\n,)]+)([^ |\]}\r\n,)]*)/g, 'var.$2.default$3');
+                if (allowMultipleValues) {
+                    exp = exp.replace(
+                        /(var\.)([^. |\]}\r\n,)]+)/g,
+                        '(inputs.$2 != undefined ? [ inputs.$2, var.$2 ] : var.$2)',
+                    );
+                } else {
+                    exp = exp.replace(
+                        /(var\.)([^. |\]}\r\n,)]+)/g,
+                        '(inputs.$2 != undefined ? inputs.$2 : var.$2.default)',
+                    );
+                }
             }
             if (exp.includes('dependency.')) {
                 exp = exp.replace(/dependency\.([^.]+)\.outputs\./g, 'dependency.$1.mock_outputs.');
@@ -463,6 +456,45 @@ function runEval(exp, tfInfo, processOutput = false) {
         value = processValue(value, tfInfo);
     }
     return value;
+}
+
+function getContext(tfInfo) {
+    let context = {
+        path: tfInfo.path,
+        terraform: tfInfo.terraform,
+        inputs: tfInfo.inputs,
+        tfInfo: tfInfo,
+        traverse: traverse,
+    };
+
+    try {
+        if (tfInfo.useCache) {
+            context.configs = tfInfo.tfCache.configs;
+            context.module = tfInfo.tfCache.configs.module;
+            context.data = tfInfo.tfCache.configs.data;
+            context.local = tfInfo.tfCache.configs.locals;
+            context.var = tfInfo.tfCache.configs.variable;
+            context.dependency = tfInfo.tfCache.configs.dependency;
+            context.outputs = tfInfo.tfCache.configs.output;
+        } else {
+            context.configs = tfInfo.configs;
+            context.module = tfInfo.configs.module;
+            context.data = tfInfo.configs.data;
+            context.local = tfInfo.configs.locals;
+            context.var = tfInfo.configs.variable;
+            context.dependency = tfInfo.configs.dependency;
+            context.outputs = tfInfo.configs.output;
+        }
+    } catch (e) {
+        console.log('Failed to get context: ' + e);
+    }
+
+    context = Object.assign(context, Terragrunt);
+    context = Object.assign(context, Terraform);
+    if (tfInfo.contextBuffer) {
+        context = Object.assign(context, tfInfo.contextBuffer);
+    }
+    return context;
 }
 
 function processValue(value, tfInfo) {
@@ -488,6 +520,9 @@ function evaluateAst(node, context) {
         case 'Literal':
             return node.value;
         case 'Identifier':
+            if (node.name == 'undefined') {
+                return undefined;
+            }
             if (context.hasOwnProperty(node.name)) {
                 return context[node.name];
             } else {
@@ -641,10 +676,26 @@ function updateValue(tfInfo, obj, key, value, overWrite = false, separator = '')
     }
 }
 
+// Update cache so that the vars are replaced with their values
+// This will be useful if the local is getting updated from vars and
+// the file that we are parsing is not the one containing locals
+function updateCacheWithVars(tfInfo, inputs) {
+    tfInfo.inputs = inputs;
+    tfInfo.useCache = false;
+    tfInfo.doEval = true;
+    for (let key in tfInfo.configs.locals) {
+        let value = tfInfo.configs.locals[key];
+        if (typeof value === 'string' && value.includes('var.')) {
+            tfInfo.configs.locals[key] = evalExpression(value, tfInfo, true);
+        }
+    }
+}
+
 const TerragruntParser = {
     traverse: traverse,
     evalExpression: evalExpression,
     processValue: processValue,
+    updateCacheWithVars: updateCacheWithVars,
 };
 
 module.exports = TerragruntParser;
