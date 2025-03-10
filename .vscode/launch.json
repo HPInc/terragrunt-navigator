@@ -26,8 +26,7 @@
       "args": [
         "-a",
         "-f",
-        "/root/workspace/reny-paul/test-module/main.tf"
-        //"tests/env/region/cluster/terragrunt.hcl"
+        "tests/terraform-module/outputs.tf"
       ]
     },
     {

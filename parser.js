@@ -467,22 +467,26 @@ function getContext(tfInfo) {
         traverse: traverse,
     };
 
-    if (tfInfo.useCache) {
-        context.configs = tfInfo.tfCache.configs;
-        context.module = tfInfo.tfCache.configs.module;
-        context.data = tfInfo.tfCache.configs.data;
-        context.local = tfInfo.tfCache.configs.locals;
-        context.var = tfInfo.tfCache.configs.variable;
-        context.dependency = tfInfo.tfCache.configs.dependency;
-        context.outputs = tfInfo.tfCache.configs.output;
-    } else {
-        context.configs = tfInfo.configs;
-        context.module = tfInfo.configs.module;
-        context.data = tfInfo.configs.data;
-        context.local = tfInfo.configs.locals;
-        context.var = tfInfo.configs.variable;
-        context.dependency = tfInfo.configs.dependency;
-        context.outputs = tfInfo.configs.output;
+    try {
+        if (tfInfo.useCache) {
+            context.configs = tfInfo.tfCache.configs;
+            context.module = tfInfo.tfCache.configs.module;
+            context.data = tfInfo.tfCache.configs.data;
+            context.local = tfInfo.tfCache.configs.locals;
+            context.var = tfInfo.tfCache.configs.variable;
+            context.dependency = tfInfo.tfCache.configs.dependency;
+            context.outputs = tfInfo.tfCache.configs.output;
+        } else {
+            context.configs = tfInfo.configs;
+            context.module = tfInfo.configs.module;
+            context.data = tfInfo.configs.data;
+            context.local = tfInfo.configs.locals;
+            context.var = tfInfo.configs.variable;
+            context.dependency = tfInfo.configs.dependency;
+            context.outputs = tfInfo.configs.output;
+        }
+    } catch (e) {
+        console.log('Failed to get context: ' + e);
     }
 
     context = Object.assign(context, Terragrunt);
@@ -672,10 +676,26 @@ function updateValue(tfInfo, obj, key, value, overWrite = false, separator = '')
     }
 }
 
+// Update cache so that the vars are replaced with their values
+// This will be useful if the local is getting updated from vars and
+// the file that we are parsing is not the one containing locals
+function updateCacheWithVars(tfInfo, inputs) {
+    tfInfo.inputs = inputs;
+    tfInfo.useCache = false;
+    tfInfo.doEval = true;
+    for (let key in tfInfo.configs.locals) {
+        let value = tfInfo.configs.locals[key];
+        if (typeof value === 'string' && value.includes('var.')) {
+            tfInfo.configs.locals[key] = evalExpression(value, tfInfo, true);
+        }
+    }
+}
+
 const TerragruntParser = {
     traverse: traverse,
     evalExpression: evalExpression,
     processValue: processValue,
+    updateCacheWithVars: updateCacheWithVars,
 };
 
 module.exports = TerragruntParser;

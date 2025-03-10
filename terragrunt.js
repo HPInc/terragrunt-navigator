@@ -223,10 +223,16 @@ if (require.main === module) {
             }
         }
 
-        tfInfo.doEval = true;
-        tfInfo.tfCache = tfInfo.useCache ? JSON.parse(JSON.stringify(tfInfo)) : null;
+        if (tfInfo.useCache) {
+            tfInfo.tfCache = JSON.parse(JSON.stringify(tfInfo));
+            Parser.updateCacheWithVars(tfInfo.tfCache, tfInfo.inputs);
+        } else {
+            tfInfo.tfCache = null;
+        }
+
         tfInfo.configs = {};
         tfInfo.ranges = {};
+        tfInfo.doEval = true;
         tfInfo.freshStart = true;
         read_terragrunt_config.apply(tfInfo, [filePath, tfInfo]);
 

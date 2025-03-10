@@ -16,6 +16,14 @@ while getopts "d" opt; do
 done
 
 SRC_DIR="${PWD}"
+echo "Testing terraform module"
+node ./terragrunt.js -f tests/terraform-module/outputs.tf -a 2>tests/debug.txt >tests/output.txt
+sed -i "s#${SRC_DIR}#TERRAGRUNT_NAVIGATOR_SRC_DIR#g" tests/output.txt
+if ! diff -u tests/expected-results/terraform-module.txt tests/output.txt; then
+  echo -e "\e[31mTest failed\e[0m"
+fi
+
+echo "Testing parser"
 node ./terragrunt.js -f tests/env/region/cluster/terragrunt.hcl -r -k 2>tests/debug.txt >tests/output.txt
 
 sed -i "s#${SRC_DIR}#TERRAGRUNT_NAVIGATOR_SRC_DIR#g" tests/output.txt

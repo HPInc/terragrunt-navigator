@@ -1,3 +1,11 @@
+v0.9.2
+- Improved variables handling and support for input
+- Support for showing multiple values for var. One the actual value and the other the variable description including default if any
+- Support for updating reference value of locals in files when the locals are defined in another file
+- Support for 'undefined' in the eval
+- Support of passing input as input.json in the module directory
+- Simplified finding of repoDir(Sonar)
+
 v0.9.1
 - Fix bug in loading contents on .hcl
 

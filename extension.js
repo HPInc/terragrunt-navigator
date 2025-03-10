@@ -344,12 +344,18 @@ class TerragruntNav {
                 }
             }
 
+            if (this.tfInfo.useCache) {
+                this.tfInfo.tfCache = this.tfCache[baseDir];
+                Parser.updateCacheWithVars(this.tfInfo.tfCache, this.tfInfo.inputs);
+            } else {
+                this.tfInfo.tfCache = null;
+            }
+
             // Clear the configs to avoid appending to the configs
             this.tfInfo.configs = {};
             this.tfInfo.ranges = {};
-            this.tfInfo.freshStart = true;
             this.doEval = true;
-            this.tfInfo.tfCache = this.tfInfo.useCache ? this.tfCache[baseDir] : null;
+            this.tfInfo.freshStart = true;
             Terragrunt.read_terragrunt_config.apply(this.tfInfo, [filePath, this.tfInfo]);
         } catch (e) {
             console.log('Failed to read terragrunt config for ' + filePath + ': ' + e);

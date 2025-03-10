@@ -1,0 +1,12 @@
+Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/main.tf
+Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/outputs.tf
+Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/variables.tf
+Reading input file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/input.json
+Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/outputs.tf
+{
+  "output": {
+    "app_identifier_output": {
+      "value": "navigator-prod-us-west-2"
+    }
+  }
+}
