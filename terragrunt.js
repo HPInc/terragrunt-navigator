@@ -181,7 +181,7 @@ if (require.main === module) {
         freshStart: true,
         printTree: argv.printTree || false,
         traverse: Parser.traverse,
-        doEval: true,
+        doEval: false,
         tfCache: null,
         configs: {
             variable: {},
@@ -197,14 +197,6 @@ if (require.main === module) {
 
         // If the same directory contains input.json, read the input.json file
         let baseDir = path.dirname(filePath);
-        let inputJson = path.join(baseDir, 'input.json');
-        if (fs.existsSync(inputJson)) {
-            tfInfo.configs.variable = {};
-            console.log('Reading input file: ' + inputJson);
-            let input = fs.readFileSync(inputJson, 'utf8');
-            let inputs = JSON.parse(input);
-            tfInfo.configs.variable = Object.assign(tfInfo.configs.variable, inputs['inputs']);
-        }
 
         tfInfo.useCache = !filePath.endsWith('.hcl');
         if (tfInfo.useCache && argv.allFiles) {
@@ -217,6 +209,18 @@ if (require.main === module) {
                     read_terragrunt_config.apply(tfInfo, [tfFile, tfInfo]);
                 }
             });
+        }
+
+        let inputJson = path.join(baseDir, 'input.json');
+        if (fs.existsSync(inputJson)) {
+            console.log('Reading input file: ' + inputJson);
+            let jsonData = fs.readFileSync(inputJson, 'utf8');
+            try {
+                let inputs = JSON.parse(jsonData);
+                tfInfo.inputs = inputs['inputs'];
+            } catch (e) {
+                console.log('Failed to parse input.json: ' + e);
+            }
         }
 
         tfInfo.doEval = true;

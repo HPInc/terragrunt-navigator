@@ -24,9 +24,9 @@
       ],
       "program": "${workspaceFolder}/terragrunt.js",
       "args": [
-        "-r",
+        "-a",
         "-f",
-        "/root/op.hcl"
+        "/root/workspace/reny-paul/test-module/main.tf"
         //"tests/env/region/cluster/terragrunt.hcl"
       ]
     },

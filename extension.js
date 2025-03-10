@@ -265,7 +265,7 @@ class TerragruntNav {
             try {
                 for (const element of match) {
                     let str = element.trim();
-                    let value = Parser.evalExpression(str, this.tfInfo, true);
+                    let value = Parser.evalExpression(str, this.tfInfo, true, true);
                     const sc = textLine.text.indexOf(element);
                     let range = new vscode.Range(line, sc, line, sc + element.length);
                     let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
@@ -330,6 +330,18 @@ class TerragruntNav {
 
                 this.cacheAccessTimes.set(baseDir, Date.now());
                 this.limitCacheSize();
+            }
+
+            let inputJson = path.join(baseDir, 'input.json');
+            if (fs.existsSync(inputJson)) {
+                console.log('Reading input file: ' + inputJson);
+                let jsonData = fs.readFileSync(inputJson, 'utf8');
+                try {
+                    let inputs = JSON.parse(jsonData);
+                    this.tfInfo.inputs = inputs['inputs'];
+                } catch (e) {
+                    console.error('Failed to parse input.json: ' + e);
+                }
             }
 
             // Clear the configs to avoid appending to the configs
@@ -479,6 +491,11 @@ class TerragruntNav {
         }
 
         let repoName = urlPath.split('/').pop();
+        let repoDir = this.findRepoDirInWorkspace(repoName);
+        return { repoUrl, ref, urlPath, modulePath, repoDir };
+    }
+
+    findRepoDirInWorkspace(repoName) {
         let repoDir = null;
         console.log('Checking workspace folders for ' + repoName);
         if (vscode.workspace.workspaceFolders) {
@@ -490,26 +507,27 @@ class TerragruntNav {
             }
             if (repoDir == null) {
                 console.log(`Didn't find ${repoName} in workspace folders. Checking one level deep`);
-                for (let folder of vscode.workspace.workspaceFolders) {
-                    console.log(`Checking in folder ${folder.uri.fsPath}`);
-                    const subdirs = fs
-                        .readdirSync(folder.uri.fsPath, { withFileTypes: true })
-                        .filter((dirent) => dirent.isDirectory())
-                        .map((dirent) => path.join(folder.uri.fsPath, dirent.name));
-                    for (let subdir of subdirs) {
-                        if (subdir.endsWith(repoName)) {
-                            repoDir = subdir;
-                            break;
-                        }
-                    }
-                    if (repoDir) {
-                        console.log(`Found ${repoName} in ${repoDir}`);
-                        break;
-                    }
+                repoDir = this.findRepoInSubdirectories(repoName);
+            }
+        }
+        return repoDir;
+    }
+
+    findRepoInSubdirectories(repoName) {
+        for (let folder of vscode.workspace.workspaceFolders) {
+            console.log(`Checking in folder ${folder.uri.fsPath}`);
+            const subdirs = fs
+                .readdirSync(folder.uri.fsPath, { withFileTypes: true })
+                .filter((dirent) => dirent.isDirectory())
+                .map((dirent) => path.join(folder.uri.fsPath, dirent.name));
+            for (let subdir of subdirs) {
+                if (subdir.endsWith(repoName)) {
+                    console.log(`Found ${repoName} in ${subdir}`);
+                    return subdir;
                 }
             }
         }
-        return { repoUrl, ref, urlPath, modulePath, repoDir };
+        return null;
     }
 
     cloneRepo(repoUrl, ref, urlPath, modulePath, repoDir) {
