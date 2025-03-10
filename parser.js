@@ -400,7 +400,7 @@ function handleStringLiteral(tfInfo, parser, node, configs, ranges, identInfo) {
 }
 
 function evalExpression(exp, tfInfo, processOutput = false) {
-    if (typeof exp !== 'string' || tfInfo.tfCache === null) {
+    if (typeof exp !== 'string' || tfInfo.doEval === false) {
         return exp;
     }
 
@@ -428,10 +428,13 @@ function runEval(exp, tfInfo, processOutput = false) {
         let context = {
             path: tfInfo.path,
             terraform: tfInfo.terraform,
-            configs: tfInfo.tfCache.configs,
-            module: tfInfo.tfCache.configs.module,
-            data: tfInfo.tfCache.configs.data,
-            local: tfInfo.tfCache.configs.locals,
+            configs: tfInfo.useCache ? tfInfo.tfCache.configs : tfInfo.configs,
+            module: tfInfo.useCache ? tfInfo.tfCache.configs.module : tfInfo.configs.module,
+            data: tfInfo.useCache ? tfInfo.tfCache.configs.data : tfInfo.configs.data,
+            local: tfInfo.useCache ? tfInfo.tfCache.configs.locals : tfInfo.configs.locals,
+            var: tfInfo.useCache ? tfInfo.tfCache.configs.variable : tfInfo.configs.variable,
+            dependency: tfInfo.useCache ? tfInfo.tfCache.configs.dependency : tfInfo.configs.dependency,
+            outputs: tfInfo.useCache ? tfInfo.tfCache.configs.output : tfInfo.configs.output,
             tfInfo: tfInfo,
             traverse: traverse,
         };
@@ -443,16 +446,10 @@ function runEval(exp, tfInfo, processOutput = false) {
 
         if (typeof exp === 'string') {
             if (exp.includes('var.')) {
-                exp = exp.replace(
-                    /(var\.)([^. |\]}\r\n,)]+)([^ |\]}\r\n,)]*)/g,
-                    'tfInfo.tfCache.configs.variable.$2.default$3',
-                );
+                exp = exp.replace(/(var\.)([^. |\]}\r\n,)]+)([^ |\]}\r\n,)]*)/g, 'var.$2.default$3');
             }
             if (exp.includes('dependency.')) {
-                exp = exp.replace(
-                    /dependency\.([^.]+)\.outputs\./g,
-                    'tfInfo.tfCache.configs.dependency.$1.mock_outputs.',
-                );
+                exp = exp.replace(/dependency\.([^.]+)\.outputs\./g, 'dependency.$1.mock_outputs.');
             }
             exp = exp.replace(/try\(/g, 'tryTerraform(');
         }

@@ -181,6 +181,7 @@ if (require.main === module) {
         freshStart: true,
         printTree: argv.printTree || false,
         traverse: Parser.traverse,
+        doEval: true,
         tfCache: null,
         configs: {
             variable: {},
@@ -205,7 +206,8 @@ if (require.main === module) {
             tfInfo.configs.variable = Object.assign(tfInfo.configs.variable, inputs['inputs']);
         }
 
-        if (argv.allFiles) {
+        tfInfo.useCache = !filePath.endsWith('.hcl');
+        if (tfInfo.useCache && argv.allFiles) {
             // Read all the .tf files in the same directory
             let files = fs.readdirSync(baseDir);
             files.forEach((file) => {
@@ -217,7 +219,8 @@ if (require.main === module) {
             });
         }
 
-        tfInfo.tfCache = JSON.parse(JSON.stringify(tfInfo));
+        tfInfo.doEval = true;
+        tfInfo.tfCache = tfInfo.useCache ? JSON.parse(JSON.stringify(tfInfo)) : null;
         tfInfo.configs = {};
         tfInfo.ranges = {};
         tfInfo.freshStart = true;

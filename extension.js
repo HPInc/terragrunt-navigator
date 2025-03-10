@@ -81,7 +81,13 @@ class TerragruntNav {
     replacementStrings = [];
     quickReplaceStringsCount = 1;
     getCodePath = '';
-    tfInfo = {};
+    tfInfo = {
+        freshStart: true,
+        printTree: false,
+        traverse: Parser.traverse,
+        doEval: true,
+        tfCache: null,
+    };
     lastModulePath = null;
     terragruntRepoCacheWSFolderExists = false;
     addTerragruntCacheToWorkspace = true;
@@ -304,12 +310,12 @@ class TerragruntNav {
             const baseDir = path.dirname(filePath);
             let fileName = path.basename(filePath);
 
-            if (baseDir != this.lastModulePath) {
-                this.tfInfo = {
-                    freshStart: true,
-                    printTree: false,
-                    traverse: Parser.traverse,
-                };
+            this.tfInfo.useCache = !fileName.endsWith('.hcl');
+
+            if (this.tfInfo.useCache && baseDir != this.lastModulePath) {
+                this.tfInfo.configs = {};
+                this.tfInfo.ranges = {};
+                this.doEval = false;
 
                 console.log('Parsing module in ' + baseDir + 'for file ' + fileName);
 
@@ -326,10 +332,12 @@ class TerragruntNav {
                 this.limitCacheSize();
             }
 
+            // Clear the configs to avoid appending to the configs
             this.tfInfo.configs = {};
             this.tfInfo.ranges = {};
             this.tfInfo.freshStart = true;
-            this.tfInfo.tfCache = this.tfCache[baseDir];
+            this.doEval = true;
+            this.tfInfo.tfCache = this.tfInfo.useCache ? this.tfCache[baseDir] : null;
             Terragrunt.read_terragrunt_config.apply(this.tfInfo, [filePath, this.tfInfo]);
         } catch (e) {
             console.log('Failed to read terragrunt config for ' + filePath + ': ' + e);
