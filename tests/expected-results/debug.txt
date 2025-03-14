@@ -220,6 +220,14 @@
         "ec": 18
       }
     },
+    "conditional": {
+      "__range": {
+        "sl": 68,
+        "sc": 2,
+        "el": 68,
+        "ec": 12
+      }
+    },
     "region_list": {
       "__range": {
         "sl": 34,
@@ -476,7 +484,7 @@
           "sl": 65,
           "sc": 32,
           "el": 65,
-          "ec": 41
+          "ec": 50
         }
       },
       {
@@ -1088,7 +1096,7 @@
   "user_names": [
     "Alice",
     "Bob",
-    "Charlie"
+    "shop"
   ],
   "kms_key_id": "development-key",
   "region_file": "region.hcl",
@@ -1293,11 +1301,11 @@ It spans multiple lines
   [
     "Alice",
     "Bob",
-    "Charlie"
+    "shop"
   ] => {65, 2, 65, 12}
     "Alice" => {65, 16, 65, 23}
     "Bob" => {65, 25, 65, 30}
-    "Charlie" => {65, 32, 65, 41}
+    "shop" => {65, 32, 65, 50}
   "development-key" => {68, 2, 68, 12}
   "region.hcl" => {70, 2, 70, 13}
   {

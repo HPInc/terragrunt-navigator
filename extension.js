@@ -263,11 +263,13 @@ class TerragruntNav {
                 continue;
             }
             try {
+                let position = 0;
                 for (const element of match) {
                     let str = element.trim();
                     let value = Parser.evalExpression(str, this.tfInfo, true, true);
-                    const sc = textLine.text.indexOf(element);
-                    let range = new vscode.Range(line, sc, line, sc + element.length);
+                    const sc = textLine.text.indexOf(element, position);
+                    position = sc + element.length;
+                    let range = new vscode.Range(line, sc, line, position);
                     let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
                     message.isTrusted = true;
                     rhsDecorations.push({ range: range, hoverMessage: message });
@@ -670,6 +672,22 @@ async function featureTogglesCommand(terragruntNav) {
     }
 }
 
+async function saveInputJsonCommand(terragruntNav) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        return;
+    }
+
+    if (terragruntNav.tfInfo?.configs.inputs === undefined) {
+        vscode.window.showInformationMessage('No inputs found in the current file');
+        return;
+    }
+
+    let inputJson = path.join(path.dirname(editor.document.uri.fsPath), 'input.json');
+    fs.writeFileSync(inputJson, JSON.stringify({ inputs: terragruntNav.tfInfo.configs.inputs }, null, 2));
+    vscode.window.showInformationMessage('Saved inputs to ' + inputJson);
+}
+
 function activate(context) {
     console.log('Terragrunt Navigator is now active!');
     let terragruntNav = new TerragruntNav(context);
@@ -689,6 +707,7 @@ function activate(context) {
         maxCacheSizeCommand: maxCacheSizeCommand,
         replacementStringsCommand: replacementStringsCommand,
         featureTogglesCommand: featureTogglesCommand,
+        saveInputJsonCommand: saveInputJsonCommand,
     };
     for (let command in commandFunctionMap) {
         context.subscriptions.push(

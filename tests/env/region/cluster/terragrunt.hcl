@@ -63,7 +63,7 @@ EOF
     { name = "server2", type = "t2.medium", active = false },
     { name = "server3", type = "t2.large", active = true }
   ]
-  user_names = ["Alice", "Bob", "Charlie"]
+  user_names = ["Alice", "Bob", local.project_name]
 
   # Conditional expressions
   kms_key_id = local.is_production ? "production-key" : "development-key"
