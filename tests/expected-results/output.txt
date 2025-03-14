@@ -82,7 +82,7 @@ Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/region.hcl
     "user_names": [
       "Alice",
       "Bob",
-      "Charlie"
+      "shop"
     ],
     "kms_key_id": "development-key",
     "region_file": "region.hcl",
