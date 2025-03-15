@@ -545,7 +545,11 @@ class TerragruntNav {
         } else {
             repoDir = path.join(this.terragruntRepoCache, urlPath);
             const now = Date.now();
-            if (this.lastClonedMap.has(repoDir) && now - this.lastClonedMap.get(repoDir) < 3000000) {
+            if (
+                fs.existsSync(repoDir) &&
+                this.lastClonedMap.has(repoDir) &&
+                now - this.lastClonedMap.get(repoDir) < 3000000
+            ) {
                 clone = false;
             } else {
                 this.lastClonedMap.set(repoDir, now);
