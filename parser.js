@@ -171,7 +171,7 @@ function handleTuple(tfInfo, parser, node, configs, ranges, identInfo) {
 function handleOperation(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let value = node.getText();
-    value = evalExpression(value, tfInfo, true);
+    value = evalExpression(value, tfInfo);
     updateValue(tfInfo, configs, ident, value);
     updateValue(tfInfo, ranges, ident, identInfo.range);
 }
@@ -183,7 +183,7 @@ function handleConditional(tfInfo, parser, node, configs, ranges, identInfo) {
     let obj = {};
     traverse(tfInfo, parser, node.children[0], obj, ranges, nodeInfo);
     tfInfo.contextBuffer = {};
-    let condition = evalExpression(node.children[0].getText(), tfInfo, true);
+    let condition = evalExpression(node.children[0].getText(), tfInfo);
     obj = {};
     if (condition) {
         traverse(tfInfo, parser, node.children[2], obj, ranges, nodeInfo);
@@ -201,7 +201,7 @@ function handleGetAttr(tfInfo, parser, node, configs, ranges, identInfo) {
     let exp = configs[ident] + attr;
     let val = exp;
     if (identInfo.evalNeeded) {
-        val = evalExpression(exp, tfInfo, true);
+        val = evalExpression(exp, tfInfo);
     }
     updateValue(tfInfo, configs, ident, val, true);
 }
@@ -221,7 +221,7 @@ function handleAttrSplat(tfInfo, parser, node, configs, ranges, identInfo) {
     let key = node.getText();
     let val = configs[ident];
 
-    let splatList = evalExpression(val, tfInfo, false);
+    let splatList = evalExpression(val, tfInfo);
     if (key.includes('.*')) {
         let attrs = key
             .split(/\.?\*\./)
@@ -248,14 +248,14 @@ function handleFullSplat(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let val = configs[ident];
     tfInfo.contextBuffer = {};
-    let splatList = evalExpression(val, tfInfo, false);
+    let splatList = evalExpression(val, tfInfo);
     let result = splatList;
     if (node.children.length > 3) {
         let suffix = node.children[3].getText();
         result = splatList.map((item) => {
             let exp = `item${suffix}`;
             tfInfo.contextBuffer = { item: item };
-            return evalExpression(exp, tfInfo, true);
+            return evalExpression(exp, tfInfo);
         });
     }
     updateValue(tfInfo, configs, ident, result, true);
@@ -267,7 +267,7 @@ function handleForTupleExpr(tfInfo, parser, node, configs, ranges, identInfo) {
         let forRule = node.children[1].children.map((node) => node.getText());
         let key = forRule[1];
         tfInfo.contextBuffer = {};
-        let list = evalExpression(forRule[3], tfInfo, false);
+        let list = evalExpression(forRule[3], tfInfo);
         let obj = {};
         let objRanges = {};
         let nodeInfo = {
@@ -286,16 +286,16 @@ function handleForTupleExpr(tfInfo, parser, node, configs, ranges, identInfo) {
         let result = [];
         list.forEach((item) => {
             tfInfo.contextBuffer[key] = item;
-            let condition = conditionExp != null ? evalExpression(conditionExp, tfInfo, false) : true;
+            let condition = conditionExp != null ? evalExpression(conditionExp, tfInfo) : true;
             if (condition) {
                 if (typeof valueExp === 'object') {
                     let value = {};
                     for (let key in valueExp) {
-                        value[key] = evalExpression(valueExp[key], tfInfo, true);
+                        value[key] = evalExpression(valueExp[key], tfInfo);
                     }
                     result.push(value);
                 } else {
-                    result.push(evalExpression(valueExp, tfInfo, true));
+                    result.push(evalExpression(valueExp, tfInfo));
                 }
             }
         });
@@ -313,7 +313,7 @@ function handleForObjectExpr(tfInfo, parser, node, configs, ranges, identInfo) {
         let forRule = node.children[1].children.map((node) => node.getText());
         let key = forRule[1];
         tfInfo.contextBuffer = {};
-        let list = evalExpression(forRule[3], tfInfo, false);
+        let list = evalExpression(forRule[3], tfInfo);
         let keyExp = node.children[2].getText();
         let obj = {};
         let objRanges = {};
@@ -333,17 +333,17 @@ function handleForObjectExpr(tfInfo, parser, node, configs, ranges, identInfo) {
         let result = {};
         list.forEach((item) => {
             tfInfo.contextBuffer[key] = item;
-            let condition = conditionExp != null ? evalExpression(conditionExp, tfInfo, false) : true;
+            let condition = conditionExp != null ? evalExpression(conditionExp, tfInfo) : true;
             if (condition) {
                 if (typeof valueExp === 'object') {
                     let value = {};
                     for (let key in valueExp) {
-                        value[key] = evalExpression(valueExp[key], tfInfo, true);
+                        value[key] = evalExpression(valueExp[key], tfInfo);
                     }
                     result[key] = value;
                 } else {
-                    let key = evalExpression(keyExp, tfInfo, true);
-                    let value = evalExpression(valueExp, tfInfo, true);
+                    let key = evalExpression(keyExp, tfInfo);
+                    let value = evalExpression(valueExp, tfInfo);
                     result[key] = value;
                 }
             }
@@ -359,7 +359,7 @@ function handleForObjectExpr(tfInfo, parser, node, configs, ranges, identInfo) {
 function handleFunctionCall(tfInfo, parser, node, configs, ranges, identInfo) {
     const ident = identInfo.name;
     let exp = node.getText();
-    let val = evalExpression(exp, tfInfo, true);
+    let val = evalExpression(exp, tfInfo);
     updateValue(tfInfo, configs, ident, val, true);
     updateValue(tfInfo, ranges, ident, identInfo.range, true);
 }
@@ -404,7 +404,7 @@ function handleQuotedTemplate(tfInfo, parser, node, configs, ranges, identInfo) 
     tfInfo.contextBuffer = {};
     value = processString(value);
     if (identInfo.evalNeeded == undefined || identInfo.evalNeeded) {
-        value = evalExpression(value, tfInfo, false);
+        value = evalExpression(value, tfInfo);
     }
     updateValue(tfInfo, configs, ident, value);
     ranges[ident] = identInfo.range;
@@ -413,12 +413,12 @@ function handleQuotedTemplate(tfInfo, parser, node, configs, ranges, identInfo) 
 function handleStringLiteral(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
     let value = node.getText();
-    value = evalExpression(value, tfInfo, false);
+    value = evalExpression(value, tfInfo);
     updateValue(tfInfo, configs, ident, value);
     ranges[ident] = identInfo.range;
 }
 
-function evalExpression(exp, tfInfo, processOutput, allowMultipleValues = false) {
+function evalExpression(exp, tfInfo, allowMultipleValues = false) {
     if (typeof exp !== 'string' || tfInfo.doEval === false) {
         return exp;
     }
@@ -429,19 +429,19 @@ function evalExpression(exp, tfInfo, processOutput, allowMultipleValues = false)
         for (const element of matches) {
             let match = element;
             let key = match.substring(2, match.length - 1);
-            let val = runEval(key, tfInfo, processOutput, allowMultipleValues);
+            let val = runEval(key, tfInfo, allowMultipleValues);
             if (typeof val === 'string' || typeof val === 'number') {
                 val = processString(String(val));
                 value = value.replace(match, val);
             }
         }
     } else {
-        value = runEval(value, tfInfo, processOutput, allowMultipleValues);
+        value = runEval(value, tfInfo, allowMultipleValues);
     }
     return value;
 }
 
-function runEval(exp, tfInfo, processOutput, allowMultipleValues) {
+function runEval(exp, tfInfo, allowMultipleValues) {
     let value = exp;
     try {
         let context = getContext(tfInfo);
@@ -713,7 +713,7 @@ function updateCacheWithVars(tfInfo, inputs) {
     for (let key in tfInfo.configs.locals) {
         let value = tfInfo.configs.locals[key];
         if (typeof value === 'string' && value.includes('var.')) {
-            tfInfo.configs.locals[key] = evalExpression(value, tfInfo, true);
+            tfInfo.configs.locals[key] = evalExpression(value, tfInfo);
         }
     }
 }

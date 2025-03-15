@@ -65,7 +65,7 @@ let rhsDecorator = vscode.window.createTextEditorDecorationType({
 class TerragruntNav {
     patterns = [
         {
-            pattern: /(source\s*=\s*")git::(ssh:\/\/|)(.*)\/\/([^#\r\n"?]+)(\?([^#\r\n"]+))?/,
+            pattern: /(source\s*=\s*)"git::(ssh:\/\/|)(.*)\/\/([^#\r\n"?]+)(\?ref=(.*)")/,
             location: 'git',
         },
         {
@@ -266,7 +266,7 @@ class TerragruntNav {
                 let position = 0;
                 for (const element of match) {
                     let str = element.trim();
-                    let value = Parser.evalExpression(str, this.tfInfo, true, true);
+                    let value = Parser.evalExpression(str, this.tfInfo, true);
                     const sc = textLine.text.indexOf(element, position);
                     position = sc + element.length;
                     let range = new vscode.Range(line, sc, line, position);
@@ -403,7 +403,7 @@ class TerragruntNav {
                 srcPath = srcPath.replace(replacement.find, replacement.replace);
             }
         }
-        srcPath = Parser.evalExpression(srcPath, this.tfInfo, true);
+        srcPath = Parser.evalExpression(srcPath, this.tfInfo);
 
         return { path: srcPath, range };
     }
@@ -478,7 +478,7 @@ class TerragruntNav {
 
     getRepoDetails(match) {
         let repoUrl = match[3];
-        let ref = match[5] ? match[5].trim().split('=')[1] : '0';
+        let ref = Parser.evalExpression(match[6], this.tfInfo);
         let modulePath = match[4].trim();
 
         let url = null;
