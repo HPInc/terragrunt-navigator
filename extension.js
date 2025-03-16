@@ -257,7 +257,7 @@ class TerragruntNav {
                 continue;
             }
 
-            let pattern = /\${(local|var|dependency)\.[^}]+}|(local|var|dependency)\.[a-zA-Z_][a-zA-Z0-9_.]*/g;
+            let pattern = /\${(local|var|dependency)\.[^}]+}|(local|var|dependency)\.[a-zA-Z_][a-zA-Z0-9_.*]+/g;
             let match = textLine.text.match(pattern);
             if (!match) {
                 continue;
@@ -311,13 +311,12 @@ class TerragruntNav {
         try {
             const baseDir = path.dirname(filePath);
             let fileName = path.basename(filePath);
-
             this.tfInfo.useCache = !fileName.endsWith('.hcl');
 
             if (this.tfInfo.useCache && baseDir != this.lastModulePath) {
                 this.tfInfo.configs = {};
                 this.tfInfo.ranges = {};
-                this.doEval = false;
+                this.tfInfo.doEval = false;
 
                 console.log('Parsing module in ' + baseDir + 'for file ' + fileName);
 
@@ -403,12 +402,12 @@ class TerragruntNav {
                 srcPath = srcPath.replace(replacement.find, replacement.replace);
             }
         }
-        srcPath = Parser.evalExpression(srcPath, this.tfInfo);
+        srcPath = Parser.evalExpression(`"${srcPath}"`, this.tfInfo);
 
         return { path: srcPath, range };
     }
 
-    // Open the file or task documentation on ctrl+click or F12
+    // Open the file on ctrl+click or F12
     provideDefinition(document, position, token) {
         let line = document.lineAt(position.line);
         let location = null;
@@ -449,6 +448,7 @@ class TerragruntNav {
             uri = this.openFileFromDirectory(uri);
         }
 
+        this.tfInfo.inputs = this.tfInfo.configs.inputs;
         return new vscode.Location(uri, new vscode.Position(0, 0));
     }
 

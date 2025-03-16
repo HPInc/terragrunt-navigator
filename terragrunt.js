@@ -200,6 +200,7 @@ if (require.main === module) {
 
         tfInfo.useCache = !filePath.endsWith('.hcl');
         if (tfInfo.useCache && argv.allFiles) {
+            tfInfo.doEval = false;
             // Read all the .tf files in the same directory
             let files = fs.readdirSync(baseDir);
             files.forEach((file) => {
