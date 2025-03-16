@@ -35,7 +35,6 @@ declare FILES=(
   LICENSE.txt
   README.md
   webpack.config.js
-  package-lock.json
   package.json
   icon.png
   extension.js
