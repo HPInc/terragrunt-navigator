@@ -355,7 +355,7 @@ class TerragruntNav {
             // Clear the configs to avoid appending to the configs
             this.tfInfo.configs = {};
             this.tfInfo.ranges = {};
-            this.doEval = true;
+            this.tfInfo.doEval = true;
             this.tfInfo.freshStart = true;
             Terragrunt.read_terragrunt_config.apply(this.tfInfo, [filePath, this.tfInfo]);
         } catch (e) {
