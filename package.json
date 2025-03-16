@@ -92,6 +92,7 @@
   },
   "dependencies": {
     "antlr4": "^4.13.2",
+    "js-yaml": "^4.1.0",
     "jsep": "^1.4.0",
     "minimist": "^1.2.8"
   },

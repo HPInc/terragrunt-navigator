@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const yaml = require('js-yaml');
 
 function abs(value) {
     return Math.abs(value);
@@ -279,6 +280,14 @@ function uuid() {
     return crypto.randomBytes(16).toString('hex');
 }
 
+function yamlencode(value) {
+    return yaml.dump(value);
+}
+
+function yamldecode(value) {
+    return yaml.load(value);
+}
+
 const Terraform = {
     abs,
     abspath,
@@ -330,6 +339,8 @@ const Terraform = {
     tryTerraform,
     upper,
     uuid,
+    yamlencode,
+    yamldecode,
 };
 
 module.exports = Terraform;

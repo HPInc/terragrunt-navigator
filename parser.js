@@ -506,16 +506,17 @@ function updateContext(exp, context, tfInfo, allowMultipleValues = false) {
         exp.match(varRegex).forEach((element) => {
             let key = element.substring(4);
             let varValue;
-            if (tfInfo.inputs.hasOwnProperty(key)) {
+            if (tfInfo.inputs?.hasOwnProperty(key)) {
                 varValue = tfInfo.inputs[key];
-            } else if (context.configs.variable.hasOwnProperty(key) && context.configs.variable[key].default) {
+            } else if (context.configs.variable[key]?.hasOwnProperty('default')) {
                 varValue = processString(context.configs.variable[key].default);
             } else {
                 varValue = 'undefined';
             }
 
             if (allowMultipleValues) {
-                context.var[key] = [varValue, context.configs.variable[key]];
+                let varDesc = removeQuotes(context.configs.variable[key]);
+                context.var[key] = [varValue, varDesc];
             } else {
                 context.var[key] = varValue;
             }
@@ -529,6 +530,21 @@ function updateContext(exp, context, tfInfo, allowMultipleValues = false) {
             context.dependency[key].outputs = depValue;
         });
     }
+}
+
+function removeQuotes(value) {
+    if (value) {
+        if (Array.isArray(value)) {
+            value = value.map((v) => removeQuotes(v));
+        } else if (typeof value === 'object') {
+            for (let key in value) {
+                value[key] = removeQuotes(value[key]);
+            }
+        } else if (typeof value === 'string' && value.startsWith('"') && value.endsWith('"')) {
+            value = value.substring(1, value.length - 1);
+        }
+    }
+    return value;
 }
 
 function processValue(value, tfInfo) {
