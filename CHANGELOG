@@ -1,3 +1,6 @@
+v1.0.3
+- Bug fix
+
 v1.0.2
 - Support for passing input when switched to a terraform module from hcl file
 - Bug fixes
