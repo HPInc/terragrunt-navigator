@@ -261,7 +261,7 @@ function trimspace(value) {
     return value.trim();
 }
 
-function tryTerraform(...expressions) {
+function terraformTry(...expressions) {
     for (const expression of expressions) {
         try {
             return expression();
@@ -336,7 +336,7 @@ const Terraform = {
     tomap,
     tolist,
     trimspace,
-    tryTerraform,
+    terraformTry,
     upper,
     uuid,
     yamlencode,

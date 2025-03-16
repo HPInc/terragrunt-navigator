@@ -178,7 +178,7 @@ function handleOperation(tfInfo, parser, node, configs, ranges, identInfo) {
 
 function handleConditional(tfInfo, parser, node, configs, ranges, identInfo) {
     let ident = identInfo.name;
-    const nodeInfo = { name: 'conditional', blockType: identInfo.blockType, range: identInfo.range };
+    const nodeInfo = { name: 'conditional', blockType: identInfo.blockType, range: identInfo.range, evalNeeded: true };
 
     let obj = {};
     traverse(tfInfo, parser, node.children[0], obj, ranges, nodeInfo);
@@ -190,7 +190,6 @@ function handleConditional(tfInfo, parser, node, configs, ranges, identInfo) {
     } else {
         traverse(tfInfo, parser, node.children[4], obj, ranges, nodeInfo);
     }
-
     updateValue(tfInfo, configs, ident, obj.conditional, true);
     updateValue(tfInfo, ranges, ident, identInfo.range, true);
 }
@@ -443,18 +442,25 @@ function evalExpression(exp, tfInfo, allowMultipleValues = false) {
 
 function runEval(exp, tfInfo, allowMultipleValues) {
     let value = exp;
+
+    let context = getContext(tfInfo);
+    if (context === null) {
+        return value;
+    }
+
     try {
-        let context = getContext(tfInfo);
-        if (context === null) {
-            return value;
-        }
         if (typeof exp === 'string') {
-            updateContext(exp, context, tfInfo, allowMultipleValues);
-            exp = exp.replace(/try\(/g, 'tryTerraform(');
+            updateVarContext(exp, context, tfInfo, allowMultipleValues);
+            exp = exp.replace(/dependency\.([^.]+)\.outputs\./g, 'dependency.$1.mock_outputs.');
+            exp = exp.replace(/try\(/g, 'terraformTry(');
         }
         value = jsepEval(exp, context);
     } catch (e) {
         console.log('Failed to evaluate expression: ' + exp + ' Error: ' + e);
+    }
+
+    if (typeof value === 'string' && (value.startsWith('./') || value.startsWith('../'))) {
+        value = path.resolve(context.path.root, value);
     }
 
     return value;
@@ -468,7 +474,6 @@ function getContext(tfInfo) {
         tfInfo: tfInfo,
         traverse: traverse,
         var: {},
-        dependency: {},
     };
 
     try {
@@ -479,6 +484,7 @@ function getContext(tfInfo) {
             context.local = tfInfo.tfCache.configs.locals;
             context.outputs = tfInfo.tfCache.configs.output;
             context.variable = tfInfo.tfCache.configs.variable;
+            context.dependency = tfInfo.tfCache.configs.dependency;
         } else {
             context.configs = tfInfo.configs;
             context.module = tfInfo.configs.module;
@@ -486,6 +492,7 @@ function getContext(tfInfo) {
             context.local = tfInfo.configs.locals;
             context.outputs = tfInfo.configs.output;
             context.variable = tfInfo.configs.variable;
+            context.dependency = tfInfo.configs.dependency;
         }
     } catch (e) {
         console.log('Failed to get context: ' + e);
@@ -500,7 +507,7 @@ function getContext(tfInfo) {
     return context;
 }
 
-function updateContext(exp, context, tfInfo, allowMultipleValues = false) {
+function updateVarContext(exp, context, tfInfo, allowMultipleValues = false) {
     if (exp.includes('var.')) {
         const varRegex = /(var\.)([^. |\]}\r\n,)]+)/g;
         exp.match(varRegex).forEach((element) => {
@@ -520,14 +527,6 @@ function updateContext(exp, context, tfInfo, allowMultipleValues = false) {
             } else {
                 context.var[key] = varValue;
             }
-        });
-    }
-    if (exp.includes('dependency.')) {
-        const depRegex = /dependency\.([^.]+)\.outputs\./g;
-        exp.match(depRegex).forEach((element) => {
-            let key = element.substring(11, element.length - 10);
-            let depValue = context.dependency[key].mock_outputs;
-            context.dependency[key].outputs = depValue;
         });
     }
 }
@@ -681,11 +680,7 @@ function evaluateCallExpression(node, context) {
 
 function jsepEval(exp, context) {
     const ast = jsep(exp);
-    let value = evaluateAst(ast, context);
-    if (typeof value === 'string' && (value.startsWith('./') || value.startsWith('../'))) {
-        value = path.resolve(context.path.root, value);
-    }
-    return value;
+    return evaluateAst(ast, context);
 }
 
 function processString(value, tfInfo = {}) {
