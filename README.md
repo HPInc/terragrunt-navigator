@@ -2,6 +2,8 @@
 
 ![Navigate](images/navigate.png)
 
+Read the blog [here](https://medium.com/@renypaulm/simplifying-terragrunt-and-terraform-workflows-with-terragrunt-terraform-navigator-2da9f5be6b2b)
+
 ### Features
 - **Path Navigation**: Quickly navigate to Terraform and Terragrunt files and folders.
 - **Git Integration**: Automatically download and navigate to git paths.
