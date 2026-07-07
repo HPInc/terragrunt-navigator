@@ -13,7 +13,9 @@ function abspath(value) {
 
 function can(exp) {
     try {
-        eval(exp);
+        // Use the extension evaluator rather than raw JavaScript eval.
+        const Parser = require('./parser');
+        Parser.evalExpression(exp, this);
         return true;
     } catch (e) {
         return false;

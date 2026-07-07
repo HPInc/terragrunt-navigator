@@ -1,3 +1,12 @@
+v1.0.4
+- Security: replaced eval() in can() with Parser.evalExpression() to prevent arbitrary JS code execution
+- Security: replaced execSync() with execFileSync() for git repository cloning to prevent shell injection
+- Security: added repository clone path boundary check to prevent writes outside the cache directory
+- Security: added input validation (URL and ref format) before initiating git clone operations
+- Dependency: bumped js-yaml to ^4.2.0; upgraded @babel/core to ^7.29.7 and webpack to ^5.108.4; added npm overrides to pin minimatch, picomatch, serialize-javascript, @babel/helpers, @babel/plugin-transform-modules-systemjs, @babel/runtime, diff, ajv and fast-uri to patched versions (resolves 9 npm audit vulnerabilities)
+- Fix: can() now correctly returns true for valid expressions (was incorrectly returning false with old eval()-based implementation)
+- Refactor: moved minimist import to CLI-only scope in terragrunt.js
+
 v1.0.3
 - Bug fix
 
