@@ -92,14 +92,14 @@
   },
   "dependencies": {
     "antlr4": "^4.13.2",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.2.0",
     "jsep": "^1.4.0",
     "minimist": "^1.2.8"
   },
   "description": "Navigate terragrunt/terrform code with Ctrl+click",
   "devDependencies": {
     "@babel/cli": "^7.25.6",
-    "@babel/core": "^7.25.2",
+    "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.25.3",
     "@types/vscode": "^1.64.0",
     "@vscode/test-electron": "^2.0.0",
@@ -107,7 +107,7 @@
     "mkdirp": "^1.0.4",
     "mocha": "^10.7.3",
     "rimraf": "^4.0.0",
-    "webpack": "^5.97.1",
+    "webpack": "^5.108.4",
     "webpack-cli": "^4.10.0"
   },
   "displayName": "Terragrunt/Terraform Navigator",
@@ -118,6 +118,17 @@
   "license": "MIT",
   "main": "./extension.js",
   "name": "terragrunt-navigator",
+  "overrides": {
+    "@babel/helpers": ">=7.29.7",
+    "@babel/plugin-transform-modules-systemjs": ">=7.29.7",
+    "@babel/runtime": ">=7.29.7",
+    "ajv": ">=8.20.0",
+    "diff": ">=5.2.2",
+    "fast-uri": ">=3.1.3",
+    "minimatch": "^9.0.5",
+    "picomatch": "^2.3.2",
+    "serialize-javascript": "^7.0.0"
+  },
   "publisher": "RenyPaul",
   "repository": {
     "type": "git",
@@ -129,5 +140,5 @@
     "compile": "java -jar /usr/local/lib/antlr-4.13.2-complete.jar -Dlanguage=JavaScript hclLexer.g4 hclParser.g4 -o generated -Xexact-output-dir -visitor && npx babel generated --out-dir generated-cjs",
     "test": "node ./parser.js tests/env/region/cluster/terragrunt.hcl"
   },
-  "version": "1.0.3"
+  "version": "1.0.4"
 }

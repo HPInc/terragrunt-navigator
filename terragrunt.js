@@ -3,7 +3,6 @@ const hclLexer = require('./generated-cjs/hclLexer').default;
 const hclParser = require('./generated-cjs/hclParser').default;
 const fs = require('fs');
 const path = require('path');
-const minimist = require('minimist');
 
 function get_aws_account_id() {
     if (process.env.AWS_ACCOUNT_ID) {
@@ -170,6 +169,7 @@ module.exports = Terragrunt;
 
 if (require.main === module) {
     const Parser = require('./parser');
+    const minimist = require('minimist');
 
     const argv = minimist(process.argv.slice(2), {
         boolean: ['printTree', 'printRange', 'printKeyInfo', 'allFiles'],

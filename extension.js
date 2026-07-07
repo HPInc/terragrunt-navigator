@@ -1,9 +1,8 @@
-﻿const vscode = require('vscode');
+const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const console = require('console');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const Parser = require('./parser');
 const Terragrunt = require('./terragrunt');
 
@@ -142,11 +141,13 @@ class TerragruntNav {
         const extensionPath = context.extensionPath;
         this.getCodePath = path.join(extensionPath, 'get-code.sh');
 
-        for (let folder of vscode.workspace.workspaceFolders) {
-            if (folder.uri.fsPath.endsWith('.terragrunt-repo-cache')) {
-                this.terragruntRepoCache = folder.uri.fsPath;
-                this.terragruntRepoCacheWSFolderExists = true;
-                break;
+        if (vscode.workspace.workspaceFolders) {
+            for (let folder of vscode.workspace.workspaceFolders) {
+                if (folder.uri.fsPath.endsWith('.terragrunt-repo-cache')) {
+                    this.terragruntRepoCache = folder.uri.fsPath;
+                    this.terragruntRepoCacheWSFolderExists = true;
+                    break;
+                }
             }
         }
 
@@ -236,7 +237,6 @@ class TerragruntNav {
         if (range.hasOwnProperty('__range')) {
             let r = range.__range;
             let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
-            message.isTrusted = true;
             decorations.push({
                 range: new vscode.Range(r.sl, r.sc, r.el, r.ec),
                 hoverMessage: message,
@@ -271,13 +271,39 @@ class TerragruntNav {
                     position = sc + element.length;
                     let range = new vscode.Range(line, sc, line, position);
                     let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
-                    message.isTrusted = true;
                     rhsDecorations.push({ range: range, hoverMessage: message });
                 }
             } catch (e) {
                 console.log('Failed for ' + textLine.text + ' ' + e);
             }
         }
+    }
+
+    toSafeFileUri(filePathValue) {
+        if (typeof filePathValue !== 'string') {
+            return null;
+        }
+
+        const trimmedValue = filePathValue.trim();
+        if (!trimmedValue) {
+            return null;
+        }
+
+        if (trimmedValue.startsWith('file://')) {
+            const parsedUri = vscode.Uri.parse(trimmedValue, true);
+            return parsedUri.scheme === 'file' ? parsedUri : null;
+        }
+
+        const hasUriScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmedValue);
+        const isWindowsAbsolutePath = /^[a-zA-Z]:[\\/]/.test(trimmedValue);
+        if (hasUriScheme && !isWindowsAbsolutePath) {
+            return null;
+        }
+
+        const resolvedPath = path.isAbsolute(trimmedValue)
+            ? path.normalize(trimmedValue)
+            : path.resolve(this.tfInfo.path.root, trimmedValue);
+        return vscode.Uri.file(resolvedPath);
     }
 
     decorateLinks(linkDecorations, links, text, line) {
@@ -295,9 +321,12 @@ class TerragruntNav {
         if (match) {
             let result = this.getPathInfo(match, line, location);
             if (result) {
-                const link = new vscode.DocumentLink(result.range, vscode.Uri.parse(result.path));
-                links.push(link);
-                let message = `[${result.path}](${result.path}): Ctrl+click to Open`;
+                const targetUri = this.toSafeFileUri(result.path);
+                if (targetUri) {
+                    const link = new vscode.DocumentLink(result.range, targetUri);
+                    links.push(link);
+                }
+                let message = `${result.path}: Ctrl+click to Open`;
                 linkDecorations.push({ range: result.range, hoverMessage: message });
             }
             return true;
@@ -444,7 +473,12 @@ class TerragruntNav {
             uri = vscode.Uri.file(result.path);
         }
 
-        if (uri && fs.lstatSync(uri.fsPath).isDirectory()) {
+        if (!uri || !fs.existsSync(uri.fsPath)) {
+            vscode.window.showWarningMessage(`Path not found: ${uri?.fsPath ?? result.path}`);
+            return null;
+        }
+
+        if (fs.lstatSync(uri.fsPath).isDirectory()) {
             uri = this.openFileFromDirectory(uri);
         }
 
@@ -522,6 +556,9 @@ class TerragruntNav {
     }
 
     findRepoInSubdirectories(repoName) {
+        if (!vscode.workspace.workspaceFolders) {
+            return null;
+        }
         for (let folder of vscode.workspace.workspaceFolders) {
             console.log(`Checking in folder ${folder.uri.fsPath}`);
             const subdirs = fs
@@ -539,11 +576,30 @@ class TerragruntNav {
     }
 
     cloneRepo(repoUrl, ref, urlPath, modulePath, repoDir) {
+        if (typeof repoUrl !== 'string' || /[\r\n]/.test(repoUrl)) {
+            vscode.window.showErrorMessage('Invalid repository URL.');
+            return null;
+        }
+
+        const safeRef = typeof ref === 'string' ? ref : String(ref ?? '');
+        if (/[\r\n]/.test(safeRef)) {
+            vscode.window.showErrorMessage('Invalid repository reference.');
+            return null;
+        }
+
         let clone = true;
         if (repoDir) {
             clone = false;
         } else {
-            repoDir = path.join(this.terragruntRepoCache, urlPath);
+            const normalizedRepoPath = path.normalize(urlPath).replace(/^([.]{2}[\\/])+/, '');
+            repoDir = path.join(this.terragruntRepoCache, normalizedRepoPath);
+            const normalizedCacheDir = path.resolve(this.terragruntRepoCache);
+            const normalizedRepoDir = path.resolve(repoDir);
+            if (!normalizedRepoDir.startsWith(normalizedCacheDir + path.sep)) {
+                vscode.window.showErrorMessage('Resolved repository path is outside the cache directory.');
+                return null;
+            }
+
             const now = Date.now();
             if (
                 fs.existsSync(repoDir) &&
@@ -561,22 +617,15 @@ class TerragruntNav {
         if (clone) {
             try {
                 vscode.window.showInformationMessage(`Cloning ${repoUrl} to ${repoDir}`);
-                let cmd = `${this.getCodePath} ${repoUrl} ${ref} ${repoDir}`;
                 if (os.platform() === 'win32') {
-                    cmd = `git-bash.exe ${cmd}`;
+                    execFileSync('git-bash.exe', [this.getCodePath, repoUrl, safeRef, repoDir], { stdio: 'pipe' });
                 } else {
-                    cmd = `bash ${cmd}`;
+                    execFileSync('bash', [this.getCodePath, repoUrl, safeRef, repoDir], { stdio: 'pipe' });
                 }
-                execSync(cmd, (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`exec error: ${error}`);
-                        vscode.window.showInformationMessage(`Error cloning repository: ${error}`);
-                    }
-                    console.log(`Repo cloned. stdout: ${stdout}`);
-                });
             } catch (error) {
                 console.error(`exec error: ${error}`);
-                vscode.window.showInformationMessage('Error cloning repository:', error);
+                vscode.window.showInformationMessage(`Error cloning repository: ${error}`);
+                return null;
             }
         }
         let dir = path.join(repoDir, modulePath);
@@ -593,7 +642,7 @@ async function quickReplaceStringsCountCommand(terragruntNav) {
 
     if (count !== undefined) {
         let config = vscode.workspace.getConfiguration('terragrunt-navigator', null);
-        await config.update('quickReplaceStringsCount', parseInt(count), vscode.ConfigurationTarget.Global);
+        await config.update('quickReplaceStringsCount', parseInt(count, 10), vscode.ConfigurationTarget.Global);
     }
 }
 
@@ -606,7 +655,7 @@ async function maxCacheSizeCommand(terragruntNav) {
 
     if (count !== undefined) {
         let config = vscode.workspace.getConfiguration('terragrunt-navigator', null);
-        await config.update('maxCacheSize', parseInt(count), vscode.ConfigurationTarget.Global);
+        await config.update('maxCacheSize', parseInt(count, 10), vscode.ConfigurationTarget.Global);
     }
 }
 
@@ -722,39 +771,45 @@ function activate(context) {
         );
     }
 
-    vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('terragrunt-navigator.quickReplaceStringsCount')) {
-            terragruntNav.quickReplaceStringsCount = vscode.workspace
-                .getConfiguration('terragrunt-navigator')
-                .get('quickReplaceStringsCount');
-        }
-        if (event.affectsConfiguration('terragrunt-navigator.maxCacheSize')) {
-            terragruntNav.maxCacheSize = vscode.workspace.getConfiguration('terragrunt-navigator').get('maxCacheSize');
-        }
-        if (event.affectsConfiguration('terragrunt-navigator.replacementStrings')) {
-            if (vscode.window.activeTextEditor) {
-                terragruntNav.provideDocumentLinks(vscode.window.activeTextEditor.document, null);
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration('terragrunt-navigator.quickReplaceStringsCount')) {
+                terragruntNav.quickReplaceStringsCount = vscode.workspace
+                    .getConfiguration('terragrunt-navigator')
+                    .get('quickReplaceStringsCount');
             }
-        }
-        // Update the feature toggles when the settings are changed
-        if (event.affectsConfiguration('terragrunt-navigator.featureToggles')) {
-            let featureToggles = getFeatureTogglesConfig();
-            terragruntNav.replaceStrings = featureToggles['ReplaceStrings'];
-            terragruntNav.addTerragruntCacheToWorkspace = featureToggles['AddTerragruntCacheToWorkspace'];
-        }
-    });
+            if (event.affectsConfiguration('terragrunt-navigator.maxCacheSize')) {
+                terragruntNav.maxCacheSize = vscode.workspace
+                    .getConfiguration('terragrunt-navigator')
+                    .get('maxCacheSize');
+            }
+            if (event.affectsConfiguration('terragrunt-navigator.replacementStrings')) {
+                if (vscode.window.activeTextEditor) {
+                    terragruntNav.provideDocumentLinks(vscode.window.activeTextEditor.document, null);
+                }
+            }
+            // Update the feature toggles when the settings are changed
+            if (event.affectsConfiguration('terragrunt-navigator.featureToggles')) {
+                let featureToggles = getFeatureTogglesConfig();
+                terragruntNav.replaceStrings = featureToggles['ReplaceStrings'];
+                terragruntNav.addTerragruntCacheToWorkspace = featureToggles['AddTerragruntCacheToWorkspace'];
+            }
+        }),
+    );
 
     // Reset the cache when the document is changed
-    vscode.workspace.onDidChangeTextDocument((event) => {
-        const editor = vscode.window.activeTextEditor;
-        if (terragruntNav.lastModulePath && editor?.document) {
-            const dirPath = path.dirname(editor.document.uri.fsPath);
-            if (terragruntNav.lastModulePath === dirPath) {
-                terragruntNav.tfCache[dirPath] = {};
-                terragruntNav.lastModulePath = null;
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeTextDocument((event) => {
+            const editor = vscode.window.activeTextEditor;
+            if (terragruntNav.lastModulePath && editor?.document) {
+                const dirPath = path.dirname(editor.document.uri.fsPath);
+                if (terragruntNav.lastModulePath === dirPath) {
+                    terragruntNav.tfCache[dirPath] = {};
+                    terragruntNav.lastModulePath = null;
+                }
             }
-        }
-    });
+        }),
+    );
 }
 
 exports.activate = activate;

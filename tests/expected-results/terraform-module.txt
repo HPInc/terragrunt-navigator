@@ -2,11 +2,19 @@ Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/main.tf
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/outputs.tf
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/variables.tf
 Reading input file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/input.json
+Failed to evaluate expression: navigator-prod Error: Error: Undefined identifier: navigator
+Failed to evaluate expression: navigator Error: Error: Undefined identifier: navigator
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/terraform-module/outputs.tf
 {
   "output": {
     "app_identifier_output": {
       "value": "navigator-prod-us-west-2"
+    },
+    "can_valid_output": {
+      "value": true
+    },
+    "can_static_output": {
+      "value": true
     }
   }
 }
