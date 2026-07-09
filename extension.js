@@ -484,6 +484,18 @@ class TerragruntNav {
 
     // Open the file on ctrl+click or F12
     provideDefinition(document, position, token) {
+        // Feature 5: dependency output navigation takes priority
+        const depRef = this.findDependencyOutputDefinition(document, position);
+        if (depRef) {
+            return this.navigateToDependencyOutput(depRef.depName, depRef.outputKey, document);
+        }
+
+        // Feature 6: locals go-to-definition
+        const localRef = this.findLocalReference(document, position);
+        if (localRef) {
+            return this.navigateToLocalDefinition(localRef, document);
+        }
+
         let line = document.lineAt(position.line);
         let location = null;
         let match = null;
@@ -581,45 +593,6 @@ class TerragruntNav {
         return null;
     }
 
-    // Feature 4: CodeLens — show "↗ Open" above each recognised path line
-    provideCodeLenses(document, token) {
-        const lenses = [];
-        for (let i = 0; i < document.lineCount; i++) {
-            const text = document.lineAt(i).text;
-            for (const p of this.patterns) {
-                if (text.match(p.pattern)) {
-                    lenses.push(new vscode.CodeLens(new vscode.Range(i, 0, i, 0)));
-                    break;
-                }
-            }
-        }
-        return lenses;
-    }
-
-    resolveCodeLens(codeLens, token) {
-        const line = codeLens.range.start.line;
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) return codeLens;
-        const text = editor.document.lineAt(line).text;
-        let match = null;
-        let location = null;
-        for (const p of this.patterns) {
-            match = text.match(p.pattern);
-            location = p.location;
-            if (match) break;
-        }
-        if (!match) return codeLens;
-        const result = this.getPathInfo(match, line, location);
-        if (!result) return codeLens;
-        const targetUri = this.toSafeFileUri(result.path);
-        if (targetUri) {
-            codeLens.command = { title: '↗ Open', command: 'vscode.open', arguments: [targetUri] };
-        } else {
-            codeLens.command = { title: '⚠ Path not resolved', command: '' };
-        }
-        return codeLens;
-    }
-
     // Feature 2: Find All References
     // Pure helper — scans file content lines and returns zero-based {line, start, end}
     // objects for every line whose resolved path matches targetFsPath (or is inside it).
@@ -687,6 +660,126 @@ class TerragruntNav {
             }
         }
         return references;
+    }
+
+    // Feature 6: locals go-to-definition
+
+    // Returns the local name if the cursor is on local.NAME, else null
+    findLocalReference(document, position) {
+        const lineText = document.lineAt(position.line).text;
+        const localPattern = /(?:local\.|local\.)\s*([a-zA-Z_][a-zA-Z0-9_]*)/g;
+        let m;
+        while ((m = localPattern.exec(lineText)) !== null) {
+            if (position.character >= m.index && position.character <= m.index + m[0].length) {
+                return m[1];
+            }
+        }
+        return null;
+    }
+
+    navigateToLocalDefinition(localName, document) {
+        // Search the current document first, then walk up to parent files
+        const location = this.searchForLocal(localName, document.uri.fsPath);
+        if (location) return location;
+        // Walk up parent directories looking for locals in terragrunt.hcl / *.hcl
+        let dir = path.dirname(document.uri.fsPath);
+        for (let i = 0; i < 8; i++) {
+            const parent = path.dirname(dir);
+            if (parent === dir) break;
+            dir = parent;
+            for (const candidate of ['terragrunt.hcl', 'locals.hcl', 'common.hcl']) {
+                const filePath = path.join(dir, candidate);
+                const loc = this.searchForLocal(localName, filePath);
+                if (loc) return loc;
+            }
+        }
+        return null;
+    }
+
+    // Scan a single file for "  NAME =" inside a locals block; returns vscode.Location or null
+    searchForLocal(localName, filePath) {
+        try {
+            if (!fs.existsSync(filePath)) return null;
+            const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+            // Simple pattern: assignment inside a locals block
+            const localDefPattern = new RegExp(`^\\s+${localName}\\s*=`);
+            let inLocals = false;
+            for (let i = 0; i < lines.length; i++) {
+                if (/^\s*locals\s*\{/.test(lines[i])) {
+                    inLocals = true;
+                }
+                if (inLocals && /^\s*\}/.test(lines[i]) && !/^\s*locals/.test(lines[i])) {
+                    inLocals = false;
+                }
+                if (inLocals && localDefPattern.test(lines[i])) {
+                    const uri = this.toSafeFileUri(filePath) ?? vscode.Uri.file(filePath);
+                    return new vscode.Location(uri, new vscode.Position(i, lines[i].indexOf(localName)));
+                }
+            }
+        } catch {
+            // unreadable file
+        }
+        return null;
+    }
+
+    // Feature 5: dependency output navigation helpers
+
+    // Returns {depName, outputKey} if cursor is on dependency.NAME.outputs.KEY, else null
+    findDependencyOutputDefinition(document, position) {
+        const lineText = document.lineAt(position.line).text;
+        const depPattern = /dependency\.([a-zA-Z_][a-zA-Z0-9_]*)\.outputs\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
+        let m;
+        while ((m = depPattern.exec(lineText)) !== null) {
+            if (position.character >= m.index && position.character <= m.index + m[0].length) {
+                return { depName: m[1], outputKey: m[2] };
+            }
+        }
+        return null;
+    }
+
+    navigateToDependencyOutput(depName, outputKey, document) {
+        this.updateConfigs();
+        const dep = this.tfInfo.configs?.dependency?.[depName];
+        if (!dep?.config_path) return null;
+        const fileDir = path.dirname(document.uri.fsPath);
+        const depDir = path.isAbsolute(dep.config_path)
+            ? path.normalize(dep.config_path)
+            : path.resolve(fileDir, dep.config_path);
+        return this.searchForOutput(outputKey, depDir);
+    }
+
+    // Scan *.tf and *.hcl files in dir for output "KEY" { and return its Location
+    searchForOutput(outputKey, searchDir) {
+        if (!searchDir) return null;
+        let dir = searchDir;
+        try {
+            if (!fs.existsSync(dir)) return null;
+            if (!fs.lstatSync(dir).isDirectory()) dir = path.dirname(dir);
+        } catch {
+            return null;
+        }
+        let files;
+        try {
+            files = fs.readdirSync(dir).filter((f) => f.endsWith('.tf') || f.endsWith('.hcl'));
+        } catch {
+            return null;
+        }
+        const outputPattern = new RegExp(`^\\s*output\\s+"${outputKey}"\\s*\\{`);
+        for (const file of files) {
+            try {
+                const lines = fs.readFileSync(path.join(dir, file), 'utf8').split('\n');
+                for (let i = 0; i < lines.length; i++) {
+                    if (outputPattern.test(lines[i])) {
+                        const fileUri =
+                            this.toSafeFileUri(path.join(dir, file)) ?? vscode.Uri.file(path.join(dir, file));
+                        return new vscode.Location(fileUri, new vscode.Position(i, 0));
+                    }
+                }
+            } catch {
+                continue;
+            }
+        }
+        return null;
     }
 
     getRepoDetails(match) {
@@ -938,9 +1031,6 @@ function activate(context) {
         );
         context.subscriptions.push(
             vscode.languages.registerReferenceProvider({ scheme: 'file', pattern: pattern }, terragruntNav),
-        );
-        context.subscriptions.push(
-            vscode.languages.registerCodeLensProvider({ scheme: 'file', pattern: pattern }, terragruntNav),
         );
     }
 
