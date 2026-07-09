@@ -581,6 +581,45 @@ class TerragruntNav {
         return null;
     }
 
+    // Feature 4: CodeLens — show "↗ Open" above each recognised path line
+    provideCodeLenses(document, token) {
+        const lenses = [];
+        for (let i = 0; i < document.lineCount; i++) {
+            const text = document.lineAt(i).text;
+            for (const p of this.patterns) {
+                if (text.match(p.pattern)) {
+                    lenses.push(new vscode.CodeLens(new vscode.Range(i, 0, i, 0)));
+                    break;
+                }
+            }
+        }
+        return lenses;
+    }
+
+    resolveCodeLens(codeLens, token) {
+        const line = codeLens.range.start.line;
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return codeLens;
+        const text = editor.document.lineAt(line).text;
+        let match = null;
+        let location = null;
+        for (const p of this.patterns) {
+            match = text.match(p.pattern);
+            location = p.location;
+            if (match) break;
+        }
+        if (!match) return codeLens;
+        const result = this.getPathInfo(match, line, location);
+        if (!result) return codeLens;
+        const targetUri = this.toSafeFileUri(result.path);
+        if (targetUri) {
+            codeLens.command = { title: '↗ Open', command: 'vscode.open', arguments: [targetUri] };
+        } else {
+            codeLens.command = { title: '⚠ Path not resolved', command: '' };
+        }
+        return codeLens;
+    }
+
     // Feature 2: Find All References
     // Pure helper — scans file content lines and returns zero-based {line, start, end}
     // objects for every line whose resolved path matches targetFsPath (or is inside it).
@@ -899,6 +938,9 @@ function activate(context) {
         );
         context.subscriptions.push(
             vscode.languages.registerReferenceProvider({ scheme: 'file', pattern: pattern }, terragruntNav),
+        );
+        context.subscriptions.push(
+            vscode.languages.registerCodeLensProvider({ scheme: 'file', pattern: pattern }, terragruntNav),
         );
     }
 
