@@ -168,6 +168,7 @@ class TerragruntNav {
         let linkDecorations = [];
         let lhsDecorations = [];
         let rhsDecorations = [];
+        let diagnostics = [];
 
         console.log('Providing document links for ' + document.uri.fsPath);
         if (!document) {
@@ -182,7 +183,7 @@ class TerragruntNav {
         }
 
         try {
-            this.decorateValues(document, rhsDecorations, linkDecorations, links);
+            this.decorateValues(document, rhsDecorations, linkDecorations, links, diagnostics);
         } catch (e) {
             console.log('Failed to decorate values: ' + e);
         }
@@ -194,6 +195,9 @@ class TerragruntNav {
             if (typeof vscode.window.activeTextEditor.setDocumentLinks === 'function') {
                 vscode.window.activeTextEditor.setDocumentLinks(links);
             }
+        }
+        if (this.diagnosticCollection) {
+            this.diagnosticCollection.set(document.uri, diagnostics);
         }
         return links;
     }
@@ -246,12 +250,12 @@ class TerragruntNav {
         }
     }
 
-    decorateValues(document, rhsDecorations, linkDecorations, links) {
+    decorateValues(document, rhsDecorations, linkDecorations, links, diagnostics) {
         for (let line = 0; line < document.lineCount; line++) {
             let textLine = document.lineAt(line);
 
             try {
-                if (this.decorateLinks(linkDecorations, links, textLine.text, line)) {
+                if (this.decorateLinks(linkDecorations, links, textLine.text, line, diagnostics)) {
                     continue;
                 }
             } catch (e) {
@@ -320,7 +324,7 @@ class TerragruntNav {
         return vscode.Uri.file(resolvedPath);
     }
 
-    decorateLinks(linkDecorations, links, text, line) {
+    decorateLinks(linkDecorations, links, text, line, diagnostics) {
         let match = null;
         let location = null;
 
@@ -351,6 +355,16 @@ class TerragruntNav {
                     message = new vscode.MarkdownString(escapedPath);
                 }
                 linkDecorations.push({ range: result.range, hoverMessage: message });
+
+                // Feature 3: Diagnostics — warn when path can't be resolved or file doesn't exist
+                if (location !== 'git' && diagnostics) {
+                    const diag = this.computePathDiagnostic(result.path, targetUri?.fsPath);
+                    if (diag) {
+                        diagnostics.push(
+                            new vscode.Diagnostic(result.range, diag.message, vscode.DiagnosticSeverity.Warning),
+                        );
+                    }
+                }
             }
             return true;
         }
@@ -550,6 +564,21 @@ class TerragruntNav {
         const fileUri = vscode.Uri.file(fileToOpen);
         vscode.commands.executeCommand('revealInExplorer', fileUri);
         return fileUri;
+    }
+
+    // Feature 3: Diagnostics — pure helper, returns {message} or null
+    computePathDiagnostic(rawPath, fsPath) {
+        if (!fsPath) {
+            return { message: `Could not resolve path: ${rawPath}` };
+        }
+        try {
+            if (!fs.existsSync(fsPath)) {
+                return { message: `Path not found: ${fsPath}` };
+            }
+        } catch {
+            // fs.existsSync may throw for network/UNC paths; no diagnostic
+        }
+        return null;
     }
 
     // Feature 2: Find All References
@@ -855,6 +884,10 @@ async function saveInputJsonCommand(terragruntNav) {
 function activate(context) {
     console.log('Terragrunt Navigator is now active!');
     let terragruntNav = new TerragruntNav(context);
+
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('terragrunt-navigator');
+    context.subscriptions.push(diagnosticCollection);
+    terragruntNav.diagnosticCollection = diagnosticCollection;
 
     let filePatterns = ['**/*.hcl', '**/*.tf'];
     for (let pattern of filePatterns) {
