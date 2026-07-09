@@ -552,6 +552,75 @@ class TerragruntNav {
         return fileUri;
     }
 
+    // Feature 2: Find All References
+    // Pure helper — scans file content lines and returns zero-based {line, start, end}
+    // objects for every line whose resolved path matches targetFsPath (or is inside it).
+    findMatchingReferences(targetFsPath, fileContent, fileFsPath) {
+        const targetNorm = targetFsPath.replace(/\\/g, '/');
+        const fileDir = path.dirname(fileFsPath);
+        const results = [];
+        const lines = fileContent.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            for (const p of this.patterns) {
+                const m = lines[i].match(p.pattern);
+                if (!m) continue;
+                const rawPath = m[3];
+                if (!rawPath) break;
+                // Only attempt resolution for relative or absolute filesystem paths
+                if (p.location === 'git') break;
+                let resolved;
+                try {
+                    resolved = path.isAbsolute(rawPath) ? path.normalize(rawPath) : path.resolve(fileDir, rawPath);
+                } catch {
+                    break;
+                }
+                const resolvedNorm = resolved.replace(/\\/g, '/');
+                if (resolvedNorm === targetNorm || resolvedNorm.startsWith(targetNorm + '/')) {
+                    results.push({ line: i, start: m.index + m[1].length, end: m.index + m[0].trimEnd().length });
+                }
+                break;
+            }
+        }
+        return results;
+    }
+
+    async provideReferences(document, position, context, token) {
+        const line = document.lineAt(position.line);
+        let match = null;
+        let location = null;
+        for (const p of this.patterns) {
+            match = line.text.match(p.pattern);
+            location = p.location;
+            if (match) break;
+        }
+        if (!match || location === 'git') return [];
+
+        this.updateConfigs();
+        const result = this.getPathInfo(match, position.line, location);
+        if (!result) return [];
+
+        const targetUri = this.toSafeFileUri(result.path);
+        if (!targetUri) return [];
+
+        const targetFsPath = targetUri.fsPath;
+        const files = await vscode.workspace.findFiles('**/*.{hcl,tf}', '**/.terraform/**');
+        const references = [];
+        for (const fileUri of files) {
+            if (token.isCancellationRequested) break;
+            try {
+                const content = fs.readFileSync(fileUri.fsPath, 'utf8');
+                for (const ref of this.findMatchingReferences(targetFsPath, content, fileUri.fsPath)) {
+                    references.push(
+                        new vscode.Location(fileUri, new vscode.Range(ref.line, ref.start, ref.line, ref.end)),
+                    );
+                }
+            } catch {
+                // skip unreadable files
+            }
+        }
+        return references;
+    }
+
     getRepoDetails(match) {
         let repoUrl = match[3];
         let ref = Parser.evalExpression(match[6], this.tfInfo);
@@ -794,6 +863,9 @@ function activate(context) {
         );
         context.subscriptions.push(
             vscode.languages.registerDefinitionProvider({ scheme: 'file', pattern: pattern }, terragruntNav),
+        );
+        context.subscriptions.push(
+            vscode.languages.registerReferenceProvider({ scheme: 'file', pattern: pattern }, terragruntNav),
         );
     }
 
