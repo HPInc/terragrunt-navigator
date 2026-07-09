@@ -191,7 +191,9 @@ class TerragruntNav {
             vscode.window.activeTextEditor.setDecorations(linkDecorator, linkDecorations);
             vscode.window.activeTextEditor.setDecorations(lhsDecorator, lhsDecorations);
             vscode.window.activeTextEditor.setDecorations(rhsDecorator, rhsDecorations);
-            vscode.window.activeTextEditor.setDocumentLinks(links);
+            if (typeof vscode.window.activeTextEditor.setDocumentLinks === 'function') {
+                vscode.window.activeTextEditor.setDocumentLinks(links);
+            }
         }
         return links;
     }
@@ -303,6 +305,18 @@ class TerragruntNav {
         const resolvedPath = path.isAbsolute(trimmedValue)
             ? path.normalize(trimmedValue)
             : path.resolve(this.tfInfo.path.root, trimmedValue);
+
+        // For Windows UNC paths (\\server\share), find the matching workspace folder
+        // to get the correct URI scheme (e.g. file://wsl.localhost/...)
+        const normalizedResolved = resolvedPath.replace(/\\/g, '/');
+        for (const folder of vscode.workspace.workspaceFolders || []) {
+            const folderFsPath = folder.uri.fsPath.replace(/\\/g, '/');
+            if (normalizedResolved.startsWith(folderFsPath + '/') || normalizedResolved === folderFsPath) {
+                const relativePart = normalizedResolved.slice(folderFsPath.length);
+                return folder.uri.with({ path: folder.uri.path + relativePart });
+            }
+        }
+
         return vscode.Uri.file(resolvedPath);
     }
 
@@ -326,7 +340,16 @@ class TerragruntNav {
                     const link = new vscode.DocumentLink(result.range, targetUri);
                     links.push(link);
                 }
-                let message = `${result.path}: Ctrl+click to Open`;
+                const MD_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '[': '&#91;', ']': '&#93;', '\\': '&#92;' };
+                const escapedPath = result.path.replace(/[&<>[\]\\]/g, (c) => MD_ESCAPE[c]);
+                let message;
+                if (targetUri) {
+                    const openCmd = `command:vscode.open?${encodeURIComponent(JSON.stringify([targetUri.toString()]))}`;
+                    message = new vscode.MarkdownString(`[${escapedPath}](${openCmd})`);
+                    message.isTrusted = true;
+                } else {
+                    message = new vscode.MarkdownString(escapedPath);
+                }
                 linkDecorations.push({ range: result.range, hoverMessage: message });
             }
             return true;
@@ -410,24 +433,33 @@ class TerragruntNav {
     }
 
     getPathInfo(match, line, location) {
-        let srcPath = '';
-        let range = null;
-        srcPath = match[3].trim();
+        let srcPath = match[3].trim();
+        const range = new vscode.Range(
+            line,
+            match.index + match[1].length,
+            line,
+            match.index + match[0].trimEnd().length,
+        );
+
         if (location === 'enclosed') {
-            let func = match[2].trim();
-            let funcArgs = match[3].trim();
+            const func = match[2].trim();
+            const funcArgs = match[3].trim();
             if (func === 'find_in_parent_folders') {
                 srcPath = Terragrunt.find_in_parent_folders.apply(this.tfInfo, [funcArgs]);
                 if (!srcPath) {
                     return null;
                 }
+                if (this.replaceStrings && typeof srcPath === 'string') {
+                    for (const replacement of this.replacementStrings) {
+                        srcPath = srcPath.replace(replacement.find, replacement.replace);
+                    }
+                }
+                return { path: srcPath, range };
             }
         }
 
-        range = new vscode.Range(line, match.index + match[1].length, line, match.index + match[0].trimEnd().length);
-
         if (this.replaceStrings && typeof srcPath === 'string') {
-            for (let replacement of this.replacementStrings) {
+            for (const replacement of this.replacementStrings) {
                 srcPath = srcPath.replace(replacement.find, replacement.replace);
             }
         }
@@ -470,44 +502,54 @@ class TerragruntNav {
             let { repoUrl, ref, urlPath, modulePath, repoDir } = this.getRepoDetails(match);
             uri = this.cloneRepo(repoUrl, ref, urlPath, modulePath, repoDir);
         } else {
-            uri = vscode.Uri.file(result.path);
+            uri = this.toSafeFileUri(result.path);
         }
 
-        if (!uri || !fs.existsSync(uri.fsPath)) {
-            vscode.window.showWarningMessage(`Path not found: ${uri?.fsPath ?? result.path}`);
+        if (!uri) {
+            vscode.window.showWarningMessage(`Path not found: ${result.path}`);
             return null;
         }
 
-        if (fs.lstatSync(uri.fsPath).isDirectory()) {
-            uri = this.openFileFromDirectory(uri);
+        try {
+            if (!fs.existsSync(uri.fsPath)) {
+                vscode.window.showWarningMessage(`Path not found: ${uri.fsPath}`);
+                return null;
+            }
+            if (fs.lstatSync(uri.fsPath).isDirectory()) {
+                uri = this.openFileFromDirectory(uri.fsPath);
+            }
+        } catch (e) {
+            // fs calls may throw for network/UNC paths; proceed with navigation
+            console.log('Could not verify path, proceeding: ' + e);
         }
 
         this.tfInfo.inputs = this.tfInfo.configs.inputs;
         return new vscode.Location(uri, new vscode.Position(0, 0));
     }
 
-    openFileFromDirectory(uri) {
-        if (uri && fs.lstatSync(uri.fsPath).isDirectory()) {
-            let dir = uri.fsPath;
-            const files = fs.readdirSync(dir);
-            if (files.length === 0) {
-                return null;
-            }
-            let fileToOpen = null;
-            let firstChoiseList = ['terragrunt.hcl', 'main.tf'];
-            for (let file of firstChoiseList) {
-                if (files.includes(file)) {
-                    fileToOpen = path.join(dir, file);
-                    break;
-                }
-            }
-            if (!fileToOpen) {
-                fileToOpen = path.join(dir, files[0]);
-            }
-            uri = vscode.Uri.file(fileToOpen);
-            vscode.commands.executeCommand('revealInExplorer', uri);
+    openFileFromDirectory(dir) {
+        if (!dir) {
+            return null;
         }
-        return uri;
+        const dirPath = typeof dir === 'string' ? dir : dir.fsPath;
+        const files = fs.readdirSync(dirPath);
+        if (files.length === 0) {
+            return null;
+        }
+        let fileToOpen = null;
+        const firstChoiceList = ['terragrunt.hcl', 'main.tf'];
+        for (const file of firstChoiceList) {
+            if (files.includes(file)) {
+                fileToOpen = path.join(dirPath, file);
+                break;
+            }
+        }
+        if (!fileToOpen) {
+            fileToOpen = path.join(dirPath, files[0]);
+        }
+        const fileUri = vscode.Uri.file(fileToOpen);
+        vscode.commands.executeCommand('revealInExplorer', fileUri);
+        return fileUri;
     }
 
     getRepoDetails(match) {
