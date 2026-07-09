@@ -609,6 +609,16 @@ class TerragruntNav {
                 if (!rawPath) break;
                 // Only attempt resolution for relative or absolute filesystem paths
                 if (p.location === 'git') break;
+
+                // find_in_parent_folders("fileName") walks up the directory tree at runtime,
+                // so we can only match by comparing the filename argument against the target basename
+                if (p.location === 'enclosed' && m[2] === 'find_in_parent_folders') {
+                    if (path.basename(rawPath) === path.basename(targetFsPath)) {
+                        results.push({ line: i, start: m.index + m[1].length, end: m.index + m[0].trimEnd().length });
+                    }
+                    break;
+                }
+
                 let resolved;
                 try {
                     resolved = path.isAbsolute(rawPath) ? path.normalize(rawPath) : path.resolve(fileDir, rawPath);
