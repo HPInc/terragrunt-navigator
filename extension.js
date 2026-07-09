@@ -68,7 +68,7 @@ class TerragruntNav {
             location: 'git',
         },
         {
-            pattern: /((source|config_path)\s*=\s*")([^#\r\n"]+)/,
+            pattern: /((source|config_path|path)\s*=\s*")([^#\r\n"]+)/,
             location: 'local',
         },
         {
