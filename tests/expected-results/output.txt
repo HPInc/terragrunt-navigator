@@ -2,6 +2,8 @@ Reading input file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/cluster/input.
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/cluster/terragrunt.hcl
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc.hcl
 Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/region.hcl
+Failed to evaluate expression: dependency.vpc.mock_outputs.vpc_id Error: TypeError: Cannot read properties of undefined (reading 'vpc')
+Failed to evaluate expression: dependency.vpc.mock_outputs.private_subnet_ids Error: TypeError: Cannot read properties of undefined (reading 'vpc')
 {
   "terraform": {
     "source": "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git//modules/aws-auth?ref=v20.24.0"
@@ -195,12 +197,23 @@ Reading file: TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/region/region.hcl
     }
   },
   "inputs": {
-    "region_code": "us-east-1"
+    "region_code": "us-east-1",
+    "vpc_id": "dependency.vpc.outputs.vpc_id",
+    "subnet_ids": "dependency.vpc.outputs.private_subnet_ids"
   },
   "dependency": {
     "vpc": {
       "config_path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc",
-      "skip_outputs": true
+      "mock_outputs": {
+        "vpc_id": "vpc-mock-00000",
+        "private_subnet_ids": [
+          "subnet-mock-1",
+          "subnet-mock-2"
+        ],
+        "public_subnet_ids": [
+          "subnet-mock-pub-1"
+        ]
+      }
     }
   },
   "include": {
