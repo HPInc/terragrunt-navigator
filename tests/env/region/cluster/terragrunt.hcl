@@ -131,11 +131,18 @@ EOF
 
 inputs = {
   region_code = "us-east-1"
+  vpc_id      = dependency.vpc.outputs.vpc_id
+  subnet_ids  = dependency.vpc.outputs.private_subnet_ids
 }
 
 dependency "vpc" {
   config_path = "../../vpc"
-  skip_outputs = true
+
+  mock_outputs = {
+    vpc_id             = "vpc-mock-00000"
+    private_subnet_ids = ["subnet-mock-1", "subnet-mock-2"]
+    public_subnet_ids  = ["subnet-mock-pub-1"]
+  }
 }
 
 include {

@@ -16,6 +16,31 @@ while getopts "d" opt; do
 done
 
 SRC_DIR="${PWD}"
+echo "Testing path navigation"
+if ! node tests/test-feature1.js; then
+  echo -e "\e[31mTest failed\e[0m"
+fi
+
+echo "Testing find all references"
+if ! node tests/test-feature2.js; then
+  echo -e "\e[31mTest failed\e[0m"
+fi
+
+echo "Testing diagnostics"
+if ! node tests/test-feature3.js; then
+  echo -e "\e[31mTest failed\e[0m"
+fi
+
+echo "Testing dependency output navigation"
+if ! node tests/test-feature5.js; then
+  echo -e "\e[31mTest failed\e[0m"
+fi
+
+echo "Testing locals go-to-definition"
+if ! node tests/test-feature6.js; then
+  echo -e "\e[31mTest failed\e[0m"
+fi
+
 echo "Testing terraform module"
 node ./terragrunt.js -f tests/terraform-module/outputs.tf -a 2>tests/debug.txt >tests/output.txt
 sed -i "s#${SRC_DIR}#TERRAGRUNT_NAVIGATOR_SRC_DIR#g" tests/output.txt

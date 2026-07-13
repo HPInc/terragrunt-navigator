@@ -971,30 +971,98 @@
         "el": 132,
         "ec": 13
       }
+    },
+    "vpc_id": {
+      "__range": {
+        "sl": 133,
+        "sc": 2,
+        "el": 133,
+        "ec": 8
+      }
+    },
+    "subnet_ids": {
+      "__range": {
+        "sl": 134,
+        "sc": 2,
+        "el": 134,
+        "ec": 12
+      }
     }
   },
   "dependency": {
     "vpc": {
       "config_path": {
         "__range": {
-          "sl": 136,
+          "sl": 138,
           "sc": 2,
-          "el": 136,
+          "el": 138,
           "ec": 13
         }
       },
-      "skip_outputs": {
+      "mock_outputs": {
         "__range": {
-          "sl": 137,
+          "sl": 140,
           "sc": 2,
-          "el": 137,
+          "el": 140,
           "ec": 14
-        }
+        },
+        "vpc_id": {
+          "__range": {
+            "sl": 141,
+            "sc": 4,
+            "el": 141,
+            "ec": 10
+          }
+        },
+        "private_subnet_ids": [
+          {
+            "__range": {
+              "sl": 142,
+              "sc": 26,
+              "el": 142,
+              "ec": 41
+            }
+          },
+          {
+            "__range": {
+              "sl": 142,
+              "sc": 43,
+              "el": 142,
+              "ec": 58
+            }
+          },
+          {
+            "__range": {
+              "sl": 142,
+              "sc": 4,
+              "el": 142,
+              "ec": 22
+            }
+          }
+        ],
+        "public_subnet_ids": [
+          {
+            "__range": {
+              "sl": 143,
+              "sc": 26,
+              "el": 143,
+              "ec": 45
+            }
+          },
+          {
+            "__range": {
+              "sl": 143,
+              "sc": 4,
+              "el": 143,
+              "ec": 21
+            }
+          }
+        ]
       },
       "__range": {
-        "sl": 135,
+        "sl": 137,
         "sc": 0,
-        "el": 135,
+        "el": 137,
         "ec": 10
       }
     }
@@ -1002,16 +1070,16 @@
   "include": {
     "path": {
       "__range": {
-        "sl": 141,
+        "sl": 148,
         "sc": 2,
-        "el": 141,
+        "el": 148,
         "ec": 6
       }
     },
     "__range": {
-      "sl": 140,
+      "sl": 147,
       "sc": 0,
-      "el": 140,
+      "el": 147,
       "ec": 7
     }
   }
@@ -1558,16 +1626,49 @@ It spans multiple lines
     "server3": "t2.large"
   } => {128, 2, 128, 11}
 {
-  "region_code": "us-east-1"
+  "region_code": "us-east-1",
+  "vpc_id": "dependency.vpc.outputs.vpc_id",
+  "subnet_ids": "dependency.vpc.outputs.private_subnet_ids"
 } => {131, 0, 131, 6}
   "us-east-1" => {132, 2, 132, 13}
+  "dependency.vpc.outputs.vpc_id" => {133, 2, 133, 8}
+  "dependency.vpc.outputs.private_subnet_ids" => {134, 2, 134, 12}
   {
     "config_path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc",
-    "skip_outputs": true
-  } => {135, 0, 135, 10}
-    "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc" => {136, 2, 136, 13}
-    true => {137, 2, 137, 14}
+    "mock_outputs": {
+      "vpc_id": "vpc-mock-00000",
+      "private_subnet_ids": [
+        "subnet-mock-1",
+        "subnet-mock-2"
+      ],
+      "public_subnet_ids": [
+        "subnet-mock-pub-1"
+      ]
+    }
+  } => {137, 0, 137, 10}
+    "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/vpc" => {138, 2, 138, 13}
+    {
+      "vpc_id": "vpc-mock-00000",
+      "private_subnet_ids": [
+        "subnet-mock-1",
+        "subnet-mock-2"
+      ],
+      "public_subnet_ids": [
+        "subnet-mock-pub-1"
+      ]
+    } => {140, 2, 140, 14}
+      "vpc-mock-00000" => {141, 4, 141, 10}
+      [
+        "subnet-mock-1",
+        "subnet-mock-2"
+      ] => {142, 4, 142, 22}
+        "subnet-mock-1" => {142, 26, 142, 41}
+        "subnet-mock-2" => {142, 43, 142, 58}
+      [
+        "subnet-mock-pub-1"
+      ] => {143, 4, 143, 21}
+        "subnet-mock-pub-1" => {143, 26, 143, 45}
 {
   "path": "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/terragrunt.hcl"
-} => {140, 0, 140, 7}
-  "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/terragrunt.hcl" => {141, 2, 141, 6}
+} => {147, 0, 147, 7}
+  "TERRAGRUNT_NAVIGATOR_SRC_DIR/tests/env/terragrunt.hcl" => {148, 2, 148, 6}

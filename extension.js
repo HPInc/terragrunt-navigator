@@ -68,7 +68,7 @@ class TerragruntNav {
             location: 'git',
         },
         {
-            pattern: /((source|config_path)\s*=\s*")([^#\r\n"]+)/,
+            pattern: /((source|config_path|path)\s*=\s*")([^#\r\n"]+)/,
             location: 'local',
         },
         {
@@ -168,6 +168,7 @@ class TerragruntNav {
         let linkDecorations = [];
         let lhsDecorations = [];
         let rhsDecorations = [];
+        let diagnostics = [];
 
         console.log('Providing document links for ' + document.uri.fsPath);
         if (!document) {
@@ -182,7 +183,7 @@ class TerragruntNav {
         }
 
         try {
-            this.decorateValues(document, rhsDecorations, linkDecorations, links);
+            this.decorateValues(document, rhsDecorations, linkDecorations, links, diagnostics);
         } catch (e) {
             console.log('Failed to decorate values: ' + e);
         }
@@ -191,7 +192,12 @@ class TerragruntNav {
             vscode.window.activeTextEditor.setDecorations(linkDecorator, linkDecorations);
             vscode.window.activeTextEditor.setDecorations(lhsDecorator, lhsDecorations);
             vscode.window.activeTextEditor.setDecorations(rhsDecorator, rhsDecorations);
-            vscode.window.activeTextEditor.setDocumentLinks(links);
+            if (typeof vscode.window.activeTextEditor.setDocumentLinks === 'function') {
+                vscode.window.activeTextEditor.setDocumentLinks(links);
+            }
+        }
+        if (this.diagnosticCollection) {
+            this.diagnosticCollection.set(document.uri, diagnostics);
         }
         return links;
     }
@@ -244,12 +250,12 @@ class TerragruntNav {
         }
     }
 
-    decorateValues(document, rhsDecorations, linkDecorations, links) {
+    decorateValues(document, rhsDecorations, linkDecorations, links, diagnostics) {
         for (let line = 0; line < document.lineCount; line++) {
             let textLine = document.lineAt(line);
 
             try {
-                if (this.decorateLinks(linkDecorations, links, textLine.text, line)) {
+                if (this.decorateLinks(linkDecorations, links, textLine.text, line, diagnostics)) {
                     continue;
                 }
             } catch (e) {
@@ -303,10 +309,22 @@ class TerragruntNav {
         const resolvedPath = path.isAbsolute(trimmedValue)
             ? path.normalize(trimmedValue)
             : path.resolve(this.tfInfo.path.root, trimmedValue);
+
+        // For Windows UNC paths (\\server\share), find the matching workspace folder
+        // to get the correct URI scheme (e.g. file://wsl.localhost/...)
+        const normalizedResolved = resolvedPath.replace(/\\/g, '/');
+        for (const folder of vscode.workspace.workspaceFolders || []) {
+            const folderFsPath = folder.uri.fsPath.replace(/\\/g, '/');
+            if (normalizedResolved.startsWith(folderFsPath + '/') || normalizedResolved === folderFsPath) {
+                const relativePart = normalizedResolved.slice(folderFsPath.length);
+                return folder.uri.with({ path: folder.uri.path + relativePart });
+            }
+        }
+
         return vscode.Uri.file(resolvedPath);
     }
 
-    decorateLinks(linkDecorations, links, text, line) {
+    decorateLinks(linkDecorations, links, text, line, diagnostics) {
         let match = null;
         let location = null;
 
@@ -326,8 +344,27 @@ class TerragruntNav {
                     const link = new vscode.DocumentLink(result.range, targetUri);
                     links.push(link);
                 }
-                let message = `${result.path}: Ctrl+click to Open`;
+                const MD_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '[': '&#91;', ']': '&#93;', '\\': '&#92;' };
+                const escapedPath = result.path.replace(/[&<>[\]\\]/g, (c) => MD_ESCAPE[c]);
+                let message;
+                if (targetUri) {
+                    const openCmd = `command:vscode.open?${encodeURIComponent(JSON.stringify([targetUri.toString()]))}`;
+                    message = new vscode.MarkdownString(`[${escapedPath}](${openCmd})`);
+                    message.isTrusted = true;
+                } else {
+                    message = new vscode.MarkdownString(escapedPath);
+                }
                 linkDecorations.push({ range: result.range, hoverMessage: message });
+
+                // Diagnostics — warn when path can't be resolved or file doesn't exist
+                if (location !== 'git' && diagnostics) {
+                    const diag = this.computePathDiagnostic(result.path, targetUri?.fsPath);
+                    if (diag) {
+                        diagnostics.push(
+                            new vscode.Diagnostic(result.range, diag.message, vscode.DiagnosticSeverity.Warning),
+                        );
+                    }
+                }
             }
             return true;
         }
@@ -410,24 +447,33 @@ class TerragruntNav {
     }
 
     getPathInfo(match, line, location) {
-        let srcPath = '';
-        let range = null;
-        srcPath = match[3].trim();
+        let srcPath = match[3].trim();
+        const range = new vscode.Range(
+            line,
+            match.index + match[1].length,
+            line,
+            match.index + match[0].trimEnd().length,
+        );
+
         if (location === 'enclosed') {
-            let func = match[2].trim();
-            let funcArgs = match[3].trim();
+            const func = match[2].trim();
+            const funcArgs = match[3].trim();
             if (func === 'find_in_parent_folders') {
                 srcPath = Terragrunt.find_in_parent_folders.apply(this.tfInfo, [funcArgs]);
                 if (!srcPath) {
                     return null;
                 }
+                if (this.replaceStrings && typeof srcPath === 'string') {
+                    for (const replacement of this.replacementStrings) {
+                        srcPath = srcPath.replace(replacement.find, replacement.replace);
+                    }
+                }
+                return { path: srcPath, range };
             }
         }
 
-        range = new vscode.Range(line, match.index + match[1].length, line, match.index + match[0].trimEnd().length);
-
         if (this.replaceStrings && typeof srcPath === 'string') {
-            for (let replacement of this.replacementStrings) {
+            for (const replacement of this.replacementStrings) {
                 srcPath = srcPath.replace(replacement.find, replacement.replace);
             }
         }
@@ -438,6 +484,18 @@ class TerragruntNav {
 
     // Open the file on ctrl+click or F12
     provideDefinition(document, position, token) {
+        // Dependency output navigation takes priority
+        const depRef = this.findDependencyOutputDefinition(document, position);
+        if (depRef) {
+            return this.navigateToDependencyOutput(depRef.depName, depRef.outputKey, document);
+        }
+
+        // Locals go-to-definition
+        const localRef = this.findLocalReference(document, position);
+        if (localRef) {
+            return this.navigateToLocalDefinition(localRef, document);
+        }
+
         let line = document.lineAt(position.line);
         let location = null;
         let match = null;
@@ -470,44 +528,268 @@ class TerragruntNav {
             let { repoUrl, ref, urlPath, modulePath, repoDir } = this.getRepoDetails(match);
             uri = this.cloneRepo(repoUrl, ref, urlPath, modulePath, repoDir);
         } else {
-            uri = vscode.Uri.file(result.path);
+            uri = this.toSafeFileUri(result.path);
         }
 
-        if (!uri || !fs.existsSync(uri.fsPath)) {
-            vscode.window.showWarningMessage(`Path not found: ${uri?.fsPath ?? result.path}`);
+        if (!uri) {
+            vscode.window.showWarningMessage(`Path not found: ${result.path}`);
             return null;
         }
 
-        if (fs.lstatSync(uri.fsPath).isDirectory()) {
-            uri = this.openFileFromDirectory(uri);
+        try {
+            if (!fs.existsSync(uri.fsPath)) {
+                vscode.window.showWarningMessage(`Path not found: ${uri.fsPath}`);
+                return null;
+            }
+            if (fs.lstatSync(uri.fsPath).isDirectory()) {
+                uri = this.openFileFromDirectory(uri.fsPath);
+            }
+        } catch (e) {
+            // fs calls may throw for network/UNC paths; proceed with navigation
+            console.log('Could not verify path, proceeding: ' + e);
         }
 
         this.tfInfo.inputs = this.tfInfo.configs.inputs;
         return new vscode.Location(uri, new vscode.Position(0, 0));
     }
 
-    openFileFromDirectory(uri) {
-        if (uri && fs.lstatSync(uri.fsPath).isDirectory()) {
-            let dir = uri.fsPath;
-            const files = fs.readdirSync(dir);
-            if (files.length === 0) {
-                return null;
+    openFileFromDirectory(dir) {
+        if (!dir) {
+            return null;
+        }
+        const dirPath = typeof dir === 'string' ? dir : dir.fsPath;
+        const files = fs.readdirSync(dirPath);
+        if (files.length === 0) {
+            return null;
+        }
+        let fileToOpen = null;
+        const firstChoiceList = ['terragrunt.hcl', 'main.tf'];
+        for (const file of firstChoiceList) {
+            if (files.includes(file)) {
+                fileToOpen = path.join(dirPath, file);
+                break;
             }
-            let fileToOpen = null;
-            let firstChoiseList = ['terragrunt.hcl', 'main.tf'];
-            for (let file of firstChoiseList) {
-                if (files.includes(file)) {
-                    fileToOpen = path.join(dir, file);
+        }
+        if (!fileToOpen) {
+            fileToOpen = path.join(dirPath, files[0]);
+        }
+        const fileUri = vscode.Uri.file(fileToOpen);
+        vscode.commands.executeCommand('revealInExplorer', fileUri);
+        return fileUri;
+    }
+
+    // Diagnostics — pure helper, returns {message} or null
+    computePathDiagnostic(rawPath, fsPath) {
+        if (!fsPath) {
+            return { message: `Could not resolve path: ${rawPath}` };
+        }
+        try {
+            if (!fs.existsSync(fsPath)) {
+                return { message: `Path not found: ${fsPath}` };
+            }
+        } catch {
+            // fs.existsSync may throw for network/UNC paths; no diagnostic
+        }
+        return null;
+    }
+
+    // Find All References
+    // Pure helper — scans file content lines and returns zero-based {line, start, end}
+    // objects for every line whose resolved path matches targetFsPath (or is inside it).
+    findMatchingReferences(targetFsPath, fileContent, fileFsPath) {
+        const targetNorm = targetFsPath.replace(/\\/g, '/');
+        const fileDir = path.dirname(fileFsPath);
+        const results = [];
+        const lines = fileContent.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            for (const p of this.patterns) {
+                const m = lines[i].match(p.pattern);
+                if (!m) continue;
+                const rawPath = m[3];
+                if (!rawPath) break;
+                // Only attempt resolution for relative or absolute filesystem paths
+                if (p.location === 'git') break;
+
+                // find_in_parent_folders("fileName") walks up the directory tree at runtime,
+                // so we can only match by comparing the filename argument against the target basename
+                if (p.location === 'enclosed' && m[2] === 'find_in_parent_folders') {
+                    if (path.basename(rawPath) === path.basename(targetFsPath)) {
+                        results.push({ line: i, start: m.index + m[1].length, end: m.index + m[0].trimEnd().length });
+                    }
                     break;
                 }
+
+                let resolved;
+                try {
+                    resolved = path.isAbsolute(rawPath) ? path.normalize(rawPath) : path.resolve(fileDir, rawPath);
+                } catch {
+                    break;
+                }
+                const resolvedNorm = resolved.replace(/\\/g, '/');
+                if (resolvedNorm === targetNorm || resolvedNorm.startsWith(targetNorm + '/')) {
+                    results.push({ line: i, start: m.index + m[1].length, end: m.index + m[0].trimEnd().length });
+                }
+                break;
             }
-            if (!fileToOpen) {
-                fileToOpen = path.join(dir, files[0]);
-            }
-            uri = vscode.Uri.file(fileToOpen);
-            vscode.commands.executeCommand('revealInExplorer', uri);
         }
-        return uri;
+        return results;
+    }
+
+    async provideReferences(document, position, context, token) {
+        const line = document.lineAt(position.line);
+        let match = null;
+        let location = null;
+        for (const p of this.patterns) {
+            match = line.text.match(p.pattern);
+            location = p.location;
+            if (match) break;
+        }
+        if (!match || location === 'git') return [];
+
+        this.updateConfigs();
+        const result = this.getPathInfo(match, position.line, location);
+        if (!result) return [];
+
+        const targetUri = this.toSafeFileUri(result.path);
+        if (!targetUri) return [];
+
+        const targetFsPath = targetUri.fsPath;
+        const files = await vscode.workspace.findFiles('**/*.{hcl,tf}', '**/.terraform/**');
+        const references = [];
+        for (const fileUri of files) {
+            if (token.isCancellationRequested) break;
+            try {
+                const content = fs.readFileSync(fileUri.fsPath, 'utf8');
+                for (const ref of this.findMatchingReferences(targetFsPath, content, fileUri.fsPath)) {
+                    references.push(
+                        new vscode.Location(fileUri, new vscode.Range(ref.line, ref.start, ref.line, ref.end)),
+                    );
+                }
+            } catch {
+                // skip unreadable files
+            }
+        }
+        return references;
+    }
+
+    // Locals go-to-definition
+
+    // Returns the local name if the cursor is on local.NAME, else null
+    findLocalReference(document, position) {
+        const lineText = document.lineAt(position.line).text;
+        const localPattern = /(?:local\.|local\.)\s*([a-zA-Z_][a-zA-Z0-9_]*)/g;
+        let m;
+        while ((m = localPattern.exec(lineText)) !== null) {
+            if (position.character >= m.index && position.character <= m.index + m[0].length) {
+                return m[1];
+            }
+        }
+        return null;
+    }
+
+    navigateToLocalDefinition(localName, document) {
+        // Search the current document first, then walk up to parent files
+        const location = this.searchForLocal(localName, document.uri.fsPath);
+        if (location) return location;
+        // Walk up parent directories looking for locals in terragrunt.hcl / *.hcl
+        let dir = path.dirname(document.uri.fsPath);
+        for (let i = 0; i < 8; i++) {
+            const parent = path.dirname(dir);
+            if (parent === dir) break;
+            dir = parent;
+            for (const candidate of ['terragrunt.hcl', 'locals.hcl', 'common.hcl']) {
+                const filePath = path.join(dir, candidate);
+                const loc = this.searchForLocal(localName, filePath);
+                if (loc) return loc;
+            }
+        }
+        return null;
+    }
+
+    // Scan a single file for "  NAME =" inside a locals block; returns vscode.Location or null
+    searchForLocal(localName, filePath) {
+        try {
+            if (!fs.existsSync(filePath)) return null;
+            const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+            // Simple pattern: assignment inside a locals block
+            const localDefPattern = new RegExp(`^\\s+${localName}\\s*=`);
+            let inLocals = false;
+            for (let i = 0; i < lines.length; i++) {
+                if (/^\s*locals\s*\{/.test(lines[i])) {
+                    inLocals = true;
+                }
+                if (inLocals && /^\s*\}/.test(lines[i]) && !/^\s*locals/.test(lines[i])) {
+                    inLocals = false;
+                }
+                if (inLocals && localDefPattern.test(lines[i])) {
+                    const uri = this.toSafeFileUri(filePath) ?? vscode.Uri.file(filePath);
+                    return new vscode.Location(uri, new vscode.Position(i, lines[i].indexOf(localName)));
+                }
+            }
+        } catch {
+            // unreadable file
+        }
+        return null;
+    }
+
+    // Dependency output navigation helpers
+
+    // Returns {depName, outputKey} if cursor is on dependency.NAME.outputs.KEY, else null
+    findDependencyOutputDefinition(document, position) {
+        const lineText = document.lineAt(position.line).text;
+        const depPattern = /dependency\.([a-zA-Z_][a-zA-Z0-9_]*)\.outputs\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
+        let m;
+        while ((m = depPattern.exec(lineText)) !== null) {
+            if (position.character >= m.index && position.character <= m.index + m[0].length) {
+                return { depName: m[1], outputKey: m[2] };
+            }
+        }
+        return null;
+    }
+
+    navigateToDependencyOutput(depName, outputKey, document) {
+        this.updateConfigs();
+        const dep = this.tfInfo.configs?.dependency?.[depName];
+        if (!dep?.config_path) return null;
+        const fileDir = path.dirname(document.uri.fsPath);
+        const depDir = path.isAbsolute(dep.config_path)
+            ? path.normalize(dep.config_path)
+            : path.resolve(fileDir, dep.config_path);
+        return this.searchForOutput(outputKey, depDir);
+    }
+
+    // Scan *.tf and *.hcl files in dir for output "KEY" { and return its Location
+    searchForOutput(outputKey, searchDir) {
+        if (!searchDir) return null;
+        let dir = searchDir;
+        try {
+            if (!fs.existsSync(dir)) return null;
+            if (!fs.lstatSync(dir).isDirectory()) dir = path.dirname(dir);
+        } catch {
+            return null;
+        }
+        let files;
+        try {
+            files = fs.readdirSync(dir).filter((f) => f.endsWith('.tf') || f.endsWith('.hcl'));
+        } catch {
+            return null;
+        }
+        const outputPattern = new RegExp(`^\\s*output\\s+"${outputKey}"\\s*\\{`);
+        for (const file of files) {
+            try {
+                const lines = fs.readFileSync(path.join(dir, file), 'utf8').split('\n');
+                for (let i = 0; i < lines.length; i++) {
+                    if (outputPattern.test(lines[i])) {
+                        const fileUri =
+                            this.toSafeFileUri(path.join(dir, file)) ?? vscode.Uri.file(path.join(dir, file));
+                        return new vscode.Location(fileUri, new vscode.Position(i, 0));
+                    }
+                }
+            } catch {
+                continue;
+            }
+        }
+        return null;
     }
 
     getRepoDetails(match) {
@@ -745,6 +1027,10 @@ function activate(context) {
     console.log('Terragrunt Navigator is now active!');
     let terragruntNav = new TerragruntNav(context);
 
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('terragrunt-navigator');
+    context.subscriptions.push(diagnosticCollection);
+    terragruntNav.diagnosticCollection = diagnosticCollection;
+
     let filePatterns = ['**/*.hcl', '**/*.tf'];
     for (let pattern of filePatterns) {
         context.subscriptions.push(
@@ -752,6 +1038,9 @@ function activate(context) {
         );
         context.subscriptions.push(
             vscode.languages.registerDefinitionProvider({ scheme: 'file', pattern: pattern }, terragruntNav),
+        );
+        context.subscriptions.push(
+            vscode.languages.registerReferenceProvider({ scheme: 'file', pattern: pattern }, terragruntNav),
         );
     }
 
