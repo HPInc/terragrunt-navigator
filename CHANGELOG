@@ -1,3 +1,13 @@
+v1.0.5
+- Feature: path = "..." in include and generate blocks is now navigable
+- Feature: Find All References support via registerReferenceProvider
+- Feature: Diagnostics for broken or unresolved paths
+- Feature: Navigate to dependency output definitions
+- Feature: Locals go-to-definition
+- Fix: restored document links and navigation
+- Fix: find_in_parent_folders reference resolution
+- Tests: added unit test suites for features and all wired into runtest.sh
+
 v1.0.4
 - Security: replaced eval() in can() with Parser.evalExpression() to prevent arbitrary JS code execution
 - Security: replaced execSync() with execFileSync() for git repository cloning to prevent shell injection
