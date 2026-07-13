@@ -1,4 +1,4 @@
-// Feature 3: Diagnostics — tests for the pure computePathDiagnostic helper
+// Diagnostics — tests for the pure computePathDiagnostic helper
 
 const fs = require('fs');
 const path = require('path');
@@ -40,7 +40,7 @@ const missingFile = path.join(tmpDir, 'tg-nav-test-nonexistent-xyz.hcl');
 // Ensure the missing file really doesn't exist
 if (fs.existsSync(missingFile)) fs.unlinkSync(missingFile);
 
-console.log('--- Feature 3: computePathDiagnostic ---');
+console.log('--- computePathDiagnostic ---');
 
 assert('no diagnostic for an existing file', computePathDiagnostic('../root.hcl', existingFile) === null);
 
@@ -69,7 +69,7 @@ assert(
     computeWithThrow('\\\\server\\share\\file.hcl', '\\\\server\\share\\file.hcl') === null,
 );
 
-console.log('--- Regression: previous features unaffected ---');
+console.log('--- Regression: previous providers unaffected ---');
 // Verify the patterns test still passes (import inline)
 const PATTERNS = [
     { pattern: /(source\s*=\s*)"git::(ssh:\/\/|)(.*)\/\/([^#\r\n"?]+)(\?ref=(.*)")/, location: 'git' },
@@ -83,7 +83,7 @@ function firstMatch(patterns, line) {
     }
     return null;
 }
-assert('feature 1 path pattern still works', firstMatch(PATTERNS, '  path = "../root.hcl"')?.location === 'local');
+assert('path navigation pattern still works', firstMatch(PATTERNS, '  path = "../root.hcl"')?.location === 'local');
 
 // Cleanup
 fs.unlinkSync(existingFile);

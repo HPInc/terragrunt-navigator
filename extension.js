@@ -356,7 +356,7 @@ class TerragruntNav {
                 }
                 linkDecorations.push({ range: result.range, hoverMessage: message });
 
-                // Feature 3: Diagnostics — warn when path can't be resolved or file doesn't exist
+                // Diagnostics — warn when path can't be resolved or file doesn't exist
                 if (location !== 'git' && diagnostics) {
                     const diag = this.computePathDiagnostic(result.path, targetUri?.fsPath);
                     if (diag) {
@@ -484,13 +484,13 @@ class TerragruntNav {
 
     // Open the file on ctrl+click or F12
     provideDefinition(document, position, token) {
-        // Feature 5: dependency output navigation takes priority
+        // Dependency output navigation takes priority
         const depRef = this.findDependencyOutputDefinition(document, position);
         if (depRef) {
             return this.navigateToDependencyOutput(depRef.depName, depRef.outputKey, document);
         }
 
-        // Feature 6: locals go-to-definition
+        // Locals go-to-definition
         const localRef = this.findLocalReference(document, position);
         if (localRef) {
             return this.navigateToLocalDefinition(localRef, document);
@@ -578,7 +578,7 @@ class TerragruntNav {
         return fileUri;
     }
 
-    // Feature 3: Diagnostics — pure helper, returns {message} or null
+    // Diagnostics — pure helper, returns {message} or null
     computePathDiagnostic(rawPath, fsPath) {
         if (!fsPath) {
             return { message: `Could not resolve path: ${rawPath}` };
@@ -593,7 +593,7 @@ class TerragruntNav {
         return null;
     }
 
-    // Feature 2: Find All References
+    // Find All References
     // Pure helper — scans file content lines and returns zero-based {line, start, end}
     // objects for every line whose resolved path matches targetFsPath (or is inside it).
     findMatchingReferences(targetFsPath, fileContent, fileFsPath) {
@@ -672,7 +672,7 @@ class TerragruntNav {
         return references;
     }
 
-    // Feature 6: locals go-to-definition
+    // Locals go-to-definition
 
     // Returns the local name if the cursor is on local.NAME, else null
     findLocalReference(document, position) {
@@ -732,7 +732,7 @@ class TerragruntNav {
         return null;
     }
 
-    // Feature 5: dependency output navigation helpers
+    // Dependency output navigation helpers
 
     // Returns {depName, outputKey} if cursor is on dependency.NAME.outputs.KEY, else null
     findDependencyOutputDefinition(document, position) {

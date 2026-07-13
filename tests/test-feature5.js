@@ -1,5 +1,5 @@
-// Feature 5: dependency output navigation
-// Also covers the find_in_parent_folders reference-matching fix (Feature 2 regression)
+// Dependency output navigation
+// Also covers the find_in_parent_folders reference-matching fix
 
 const fs = require('fs');
 const path = require('path');

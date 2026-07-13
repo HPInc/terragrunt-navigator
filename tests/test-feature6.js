@@ -1,4 +1,4 @@
-// Feature 6: locals go-to-definition
+// Locals go-to-definition
 
 const fs = require('fs');
 const path = require('path');
@@ -65,7 +65,7 @@ inputs = {
 `,
 );
 
-console.log('--- Feature 6: findLocalReference ---');
+console.log('--- findLocalReference ---');
 
 const line1 = '  cluster = local.cluster_name';
 assert(
@@ -87,7 +87,7 @@ assert(
 
 assert('non-local line returns null', findLocalReference('  value = var.name', 10) === null);
 
-console.log('--- Feature 6: searchForLocal ---');
+console.log('--- searchForLocal ---');
 
 const r1 = searchForLocal('region_code', testHcl);
 assert('finds region_code in locals block', r1 !== null);
@@ -118,7 +118,7 @@ fs.writeFileSync(
 assert('does not match assignment outside locals block', searchForLocal('region_code', noLocals) === null);
 
 console.log('--- Regression ---');
-// Feature 5 helper still works
+// dependency output helper still works
 function findDependencyOutputDefinition(lineText, character) {
     const depPattern = /dependency\.([a-zA-Z_][a-zA-Z0-9_]*)\.outputs\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
     let m;
@@ -128,7 +128,7 @@ function findDependencyOutputDefinition(lineText, character) {
     return null;
 }
 assert(
-    'feature 5 pattern unchanged',
+    'dependency output pattern unchanged',
     findDependencyOutputDefinition('x = dependency.vpc.outputs.id', 20)?.outputKey === 'id',
 );
 

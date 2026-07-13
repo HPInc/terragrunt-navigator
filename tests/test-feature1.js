@@ -1,4 +1,4 @@
-// Feature 1: path = "..." in include/generate blocks should be navigable
+// path = "..." in include/generate blocks should be navigable
 
 const PATTERNS_BEFORE = [
     { pattern: /(source\s*=\s*)"git::(ssh:\/\/|)(.*)\/\/([^#\r\n"?]+)(\?ref=(.*)")/, location: 'git' },
@@ -54,7 +54,7 @@ assert(
         ?.location === 'enclosed',
 );
 
-console.log('--- Feature 1: path = "..." ---');
+console.log('--- path = "..." ---');
 assert('path literal NOT matched BEFORE', firstMatch(PATTERNS_BEFORE, '  path = "../root.hcl"') === null);
 assert(
     'path literal matched AFTER (local)',

@@ -1,4 +1,4 @@
-// Feature 2: Find All References — tests for the pure findMatchingReferences helper
+// Find All References — tests for the pure findMatchingReferences helper
 
 const path = require('path');
 
@@ -62,7 +62,7 @@ function assert(desc, cond) {
 // Simulate workspace root
 const BASE = '/workspace/project';
 
-console.log('--- Feature 2: findMatchingReferences ---');
+console.log('--- findMatchingReferences ---');
 
 // Two callers in different subdirectories both resolving to the same module
 const moduleTarget = BASE + '/modules/vpc';
@@ -119,14 +119,14 @@ config_path = "../../modules/vpc"
 const r6 = findMatchingReferences(PATTERNS, moduleTarget, multiContent, BASE + '/envs/prod/terragrunt.hcl');
 assert('two references in same file both found', r6.length === 2);
 
-console.log('--- Regression: feature 1 pattern still correct ---');
+console.log('--- Regression: path navigation pattern still correct ---');
 // From /workspace/project/envs/prod/  →  ../../root.hcl
-const feature1Content = `
+const pathNavContent = `
 include "root" {
   path = "../../root.hcl"
 }
 `;
-const rf1 = findMatchingReferences(PATTERNS, BASE + '/root.hcl', feature1Content, BASE + '/envs/prod/terragrunt.hcl');
+const rf1 = findMatchingReferences(PATTERNS, BASE + '/root.hcl', pathNavContent, BASE + '/envs/prod/terragrunt.hcl');
 assert('path = in include block is found as reference', rf1.length === 1);
 
 console.log(`\n${passed} passed, ${failed} failed`);

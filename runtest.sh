@@ -16,27 +16,27 @@ while getopts "d" opt; do
 done
 
 SRC_DIR="${PWD}"
-echo "Testing feature 1"
+echo "Testing path navigation"
 if ! node tests/test-feature1.js; then
   echo -e "\e[31mTest failed\e[0m"
 fi
 
-echo "Testing feature 2"
+echo "Testing find all references"
 if ! node tests/test-feature2.js; then
   echo -e "\e[31mTest failed\e[0m"
 fi
 
-echo "Testing feature 3"
+echo "Testing diagnostics"
 if ! node tests/test-feature3.js; then
   echo -e "\e[31mTest failed\e[0m"
 fi
 
-echo "Testing feature 5"
+echo "Testing dependency output navigation"
 if ! node tests/test-feature5.js; then
   echo -e "\e[31mTest failed\e[0m"
 fi
 
-echo "Testing feature 6"
+echo "Testing locals go-to-definition"
 if ! node tests/test-feature6.js; then
   echo -e "\e[31mTest failed\e[0m"
 fi
