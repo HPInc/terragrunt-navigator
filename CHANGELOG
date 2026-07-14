@@ -1,3 +1,15 @@
+v1.0.6
+- Fix: config_path and relative path links now both show the resolved absolute path in hover
+- Fix: DocumentLink for directory paths (config_path = "../../vpc") now navigates to terragrunt.hcl inside the directory
+- Fix: duplicate hover tooltip (e.g. "shop" shown twice) when hovering over local references in array literals
+- Fix: local variable go-to-definition now highlights the variable name at the definition site
+- Fix: invalid path indicator changed to orange wavy underline instead of yellow diagnostic
+- Fix: invalid CSS color 'lightorange' in decorators replaced with valid hex values
+- Fix: hover path display normalized to single backslashes (\\wsl.localhost\...) instead of double-escaped JSON
+- Fix: JSON code block language set to plain for primitive values to avoid escape-sequence color artifacts
+- Feature: flashDefinitionHighlight — brief find-match style highlight at definition location after go-to-definition
+- Feature: dependency output references (dependency.NAME.outputs.KEY) navigation now also flashes the definition
+
 v1.0.5
 - Feature: path = "..." in include and generate blocks is now navigable
 - Feature: Find All References support via registerReferenceProvider
