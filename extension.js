@@ -16,11 +16,11 @@ let linkDecorator = vscode.window.createTextEditorDecorationType({
         fontWeight: 'bold',
     },
     light: {
-        color: 'darkorange',
+        color: '#C87800',
         borderColor: 'darkblue',
     },
     dark: {
-        color: 'lightorange',
+        color: '#FFD580',
         borderColor: 'lightblue',
     },
 });
@@ -53,11 +53,11 @@ let rhsDecorator = vscode.window.createTextEditorDecorationType({
     },
     light: {
         color: 'lightgreen',
-        borderColor: 'lightorange',
+        borderColor: '#FFA040',
     },
     dark: {
         color: 'lightgreen',
-        borderColor: 'lightorange',
+        borderColor: '#FFA040',
     },
 });
 
@@ -233,7 +233,8 @@ class TerragruntNav {
             let r = rangeArray[i];
             if (typeof v === 'object' && v !== null) {
                 this.decorateKeys(decorations, v, r);
-            } else {
+            } else if (false) {
+                // scalars handled by decorateValues — skip to avoid duplicate hovers
                 this.updateDecorations(decorations, v, r);
             }
         }
@@ -242,7 +243,9 @@ class TerragruntNav {
     updateDecorations(decorations, value, range) {
         if (range.hasOwnProperty('__range')) {
             let r = range.__range;
-            let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
+            const jsonStr = JSON.stringify(value, null, 2).replace(/\\\\/g, '\\');
+            const lang = Array.isArray(value) || (typeof value === 'object' && value !== null) ? 'json' : '';
+            let message = new vscode.MarkdownString(`\`\`\`${lang}\n${jsonStr}\n\`\`\``);
             decorations.push({
                 range: new vscode.Range(r.sl, r.sc, r.el, r.ec),
                 hoverMessage: message,
@@ -276,7 +279,9 @@ class TerragruntNav {
                     const sc = textLine.text.indexOf(element, position);
                     position = sc + element.length;
                     let range = new vscode.Range(line, sc, line, position);
-                    let message = new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``);
+                    const jsonStr2 = JSON.stringify(value, null, 2).replace(/\\\\/g, '\\');
+                    const lang2 = Array.isArray(value) || (typeof value === 'object' && value !== null) ? 'json' : '';
+                    let message = new vscode.MarkdownString(`\`\`\`${lang2}\n${jsonStr2}\n\`\`\``);
                     rhsDecorations.push({ range: range, hoverMessage: message });
                 }
             } catch (e) {
@@ -324,6 +329,29 @@ class TerragruntNav {
         return vscode.Uri.file(resolvedPath);
     }
 
+    resolveDirectoryToFile(uri) {
+        if (!uri) return null;
+        try {
+            const fsPath = uri.fsPath;
+            if (fs.existsSync(fsPath) && fs.lstatSync(fsPath).isDirectory()) {
+                const files = fs.readdirSync(fsPath);
+                for (const name of ['terragrunt.hcl', 'main.tf']) {
+                    if (files.includes(name)) {
+                        return this.toSafeFileUri(path.join(fsPath, name)) ?? vscode.Uri.file(path.join(fsPath, name));
+                    }
+                }
+                if (files.length > 0) {
+                    return (
+                        this.toSafeFileUri(path.join(fsPath, files[0])) ?? vscode.Uri.file(path.join(fsPath, files[0]))
+                    );
+                }
+            }
+        } catch {
+            // network/UNC path or inaccessible – proceed as-is
+        }
+        return uri;
+    }
+
     decorateLinks(linkDecorations, links, text, line, diagnostics) {
         let match = null;
         let location = null;
@@ -339,13 +367,15 @@ class TerragruntNav {
         if (match) {
             let result = this.getPathInfo(match, line, location);
             if (result) {
-                const targetUri = this.toSafeFileUri(result.path);
+                const rawUri = this.toSafeFileUri(result.path);
+                const targetUri = this.resolveDirectoryToFile(rawUri);
                 if (targetUri) {
                     const link = new vscode.DocumentLink(result.range, targetUri);
                     links.push(link);
                 }
-                const MD_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '[': '&#91;', ']': '&#93;', '\\': '&#92;' };
-                const escapedPath = result.path.replace(/[&<>[\]\\]/g, (c) => MD_ESCAPE[c]);
+                const displayPath = rawUri ? rawUri.fsPath : result.path.replace(/\\/g, '/');
+                const MD_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '[': '&#91;', ']': '&#93;', '\\': '\\\\' };
+                const escapedPath = displayPath.replace(/[&<>[\]\\]/g, (c) => MD_ESCAPE[c]);
                 let message;
                 if (targetUri) {
                     const openCmd = `command:vscode.open?${encodeURIComponent(JSON.stringify([targetUri.toString()]))}`;
@@ -487,13 +517,17 @@ class TerragruntNav {
         // Dependency output navigation takes priority
         const depRef = this.findDependencyOutputDefinition(document, position);
         if (depRef) {
-            return this.navigateToDependencyOutput(depRef.depName, depRef.outputKey, document);
+            const depLoc = this.navigateToDependencyOutput(depRef.depName, depRef.outputKey, document);
+            if (depLoc) this.flashDefinitionHighlight(depLoc);
+            return depLoc;
         }
 
         // Locals go-to-definition
         const localRef = this.findLocalReference(document, position);
         if (localRef) {
-            return this.navigateToLocalDefinition(localRef, document);
+            const localLoc = this.navigateToLocalDefinition(localRef, document);
+            if (localLoc) this.flashDefinitionHighlight(localLoc);
+            return localLoc;
         }
 
         let line = document.lineAt(position.line);
@@ -687,6 +721,31 @@ class TerragruntNav {
         return null;
     }
 
+    flashDefinitionHighlight(location) {
+        const decType = vscode.window.createTextEditorDecorationType({
+            backgroundColor: new vscode.ThemeColor('editor.findMatchHighlightBackground'),
+            overviewRulerColor: new vscode.ThemeColor('editorOverviewRuler.findMatchForeground'),
+            overviewRulerLane: vscode.OverviewRulerLane.Center,
+            fontWeight: 'bold',
+        });
+        const tryApply = (attempts) => {
+            if (attempts <= 0) {
+                decType.dispose();
+                return;
+            }
+            const editor = vscode.window.visibleTextEditors.find(
+                (e) => e.document.uri.toString() === location.uri.toString(),
+            );
+            if (editor) {
+                editor.setDecorations(decType, [location.range]);
+                setTimeout(() => decType.dispose(), 2500);
+            } else {
+                setTimeout(() => tryApply(attempts - 1), 100);
+            }
+        };
+        tryApply(15);
+    }
+
     navigateToLocalDefinition(localName, document) {
         // Search the current document first, then walk up to parent files
         const location = this.searchForLocal(localName, document.uri.fsPath);
@@ -723,7 +782,8 @@ class TerragruntNav {
                 }
                 if (inLocals && localDefPattern.test(lines[i])) {
                     const uri = this.toSafeFileUri(filePath) ?? vscode.Uri.file(filePath);
-                    return new vscode.Location(uri, new vscode.Position(i, lines[i].indexOf(localName)));
+                    const col = lines[i].indexOf(localName);
+                    return new vscode.Location(uri, new vscode.Range(i, col, i, col + localName.length));
                 }
             }
         } catch {
