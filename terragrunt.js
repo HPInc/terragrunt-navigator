@@ -16,7 +16,8 @@ function find_in_parent_folders(fileName = null) {
     if (fileName === null) {
         fileName = 'terragrunt.hcl';
     }
-    let currentDir = path.dirname(this.path.root);
+    const rootDir = this?.path?.root || process.cwd();
+    let currentDir = path.dirname(rootDir);
     const isWindows = process.platform === 'win32';
 
     while (true) {

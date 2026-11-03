@@ -96,7 +96,7 @@
     "jsep": "^1.4.0",
     "minimist": "^1.2.8"
   },
-  "description": "Navigate terragrunt/terrform code with Ctrl+click",
+  "description": "Navigate terragrunt/terraform code with Ctrl+click (Cmd+click on macOS) or F12",
   "devDependencies": {
     "@babel/cli": "^7.25.6",
     "@babel/core": "^7.29.7",
