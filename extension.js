@@ -95,7 +95,7 @@ class TerragruntNav {
     maxCacheSize = 10;
 
     constructor(context) {
-        const repoCacheDir = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
+        const repoCacheDir = os.homedir();
         this.terragruntRepoCache = path.join(repoCacheDir, '.terragrunt-repo-cache');
         this.lastClonedMap = new Map();
         let config = vscode.workspace.getConfiguration('terragrunt-navigator');
@@ -175,7 +175,7 @@ class TerragruntNav {
             return;
         }
 
-        this.updateConfigs();
+        this.updateConfigs(document);
         try {
             this.decorateKeys(lhsDecorations, this.tfInfo.configs, this.tfInfo.ranges);
         } catch (e) {
@@ -313,7 +313,13 @@ class TerragruntNav {
 
         const resolvedPath = path.isAbsolute(trimmedValue)
             ? path.normalize(trimmedValue)
-            : path.resolve(this.tfInfo.path.root, trimmedValue);
+            : path.resolve(
+                  this.tfInfo?.path?.root ||
+                      (vscode.window.activeTextEditor?.document
+                          ? path.dirname(vscode.window.activeTextEditor.document.uri.fsPath)
+                          : process.cwd()),
+                  trimmedValue,
+              );
 
         // For Windows UNC paths (\\server\share), find the matching workspace folder
         // to get the correct URI scheme (e.g. file://wsl.localhost/...)
@@ -402,11 +408,24 @@ class TerragruntNav {
         return false;
     }
 
-    updateConfigs() {
-        const filePath = vscode.window.activeTextEditor.document.uri.fsPath;
+    updateConfigs(doc) {
+        const activeDoc = doc || vscode.window.activeTextEditor?.document;
+        if (!activeDoc) {
+            return;
+        }
+        const filePath = activeDoc.uri.fsPath;
+
+
         try {
             const baseDir = path.dirname(filePath);
             let fileName = path.basename(filePath);
+            if (!this.tfInfo.path || this.tfInfo.path.root !== baseDir) {
+                this.tfInfo.path = {
+                    module: baseDir,
+                    root: baseDir,
+                    cwd: baseDir,
+                };
+            }
             this.tfInfo.useCache = !fileName.endsWith('.hcl');
 
             if (this.tfInfo.useCache && baseDir != this.lastModulePath) {
@@ -545,7 +564,7 @@ class TerragruntNav {
             return null;
         }
 
-        this.updateConfigs();
+        this.updateConfigs(document);
 
         let result = this.getPathInfo(match, position.line, location);
         if (!result) {
@@ -680,7 +699,7 @@ class TerragruntNav {
         }
         if (!match || location === 'git') return [];
 
-        this.updateConfigs();
+        this.updateConfigs(document);
         const result = this.getPathInfo(match, position.line, location);
         if (!result) return [];
 
@@ -808,7 +827,7 @@ class TerragruntNav {
     }
 
     navigateToDependencyOutput(depName, outputKey, document) {
-        this.updateConfigs();
+        this.updateConfigs(document);
         const dep = this.tfInfo.configs?.dependency?.[depName];
         if (!dep?.config_path) return null;
         const fileDir = path.dirname(document.uri.fsPath);

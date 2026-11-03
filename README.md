@@ -14,7 +14,7 @@ Read the blog [here](https://medium.com/@renypaulm/simplifying-terragrunt-and-te
 - **Path Recognition**:
   - Recognized paths will be underlined.
   - Hover the mouse over the path to check the resolved path.
-  - Use `Ctrl+Click` or `F12` to navigate to that file/folder.
+  - Use `Ctrl+Click` (or `Cmd+Click` on macOS) / `F12` to navigate to that file/folder.
   - If it is a git path, it will be downloaded to the home directory under .terragrunt-repo-cache
     - The folder will be loaded in the workspace.
     - It will navigate to the `main.tf` file or the first `.tf` file found.

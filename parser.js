@@ -696,7 +696,8 @@ function processString(value, tfInfo = {}) {
     }
 
     if (tfInfo && (value.startsWith('./') || value.startsWith('../'))) {
-        value = path.resolve(tfInfo.path.root, value);
+        const baseRoot = tfInfo?.path?.root || process.cwd();
+        value = path.resolve(baseRoot, value);
     }
 
     return value;
